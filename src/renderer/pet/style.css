@@ -24,26 +24,13 @@ button {
 #tablet {
   position: absolute;
   inset: 0;
-  border-radius: 34px;
-  background: linear-gradient(160deg, #2b303c 0%, #171a22 42%, #0c0e13 100%);
-  /* 只留内缘光效：窗口外壳撑满、无绘制余量，外投影会被窗口边界硬切成黑圈 */
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.16),
-    inset 0 -1px 2px rgba(0, 0, 0, 0.65),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
-  padding: 16px 14px 18px;
+  background: transparent; /* 边框退役：屏幕直接撑满窗口，四角不再露外壳底色 */
+  padding: 0;
 }
 
 .camera {
   position: absolute;
-  top: 6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #3d4a63, #0a0c10 70%);
-  box-shadow: inset 0 0 1px rgba(120, 180, 255, 0.4);
+  display: none; /* 假摄像头原是边框上的装饰，无边框后改为隐藏 */
 }
 
 /* 边框拖动区（屏幕外一圈） */
@@ -85,7 +72,7 @@ button {
   position: relative;
   width: 100%;
   height: 100%;
-  border-radius: 20px;
+  border-radius: 34px; /* 与窗口圆角一致：内容即轮廓 */
   overflow: hidden;
   background: linear-gradient(180deg, #101722 0%, #0a0d13 100%);
   box-shadow:
