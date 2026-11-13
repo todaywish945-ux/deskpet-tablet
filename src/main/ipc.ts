@@ -1,6 +1,6 @@
-import { ipcMain, app, dialog, BrowserWindow } from 'electron'
+import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
 import { AppConfig } from '../shared/types'
-import { getPetWindow, startDrag, stopDrag, popupPetMenu, applyPetLayer, setIslandToggleHandler, setHideToIslandHandler, setCollapseToIslandHandler } from './petWindow'
+import { getPetWindow, startDrag, stopDrag, popupPetMenu, applyPetLayer, setIslandToggleHandler, setHideToIslandHandler, setCollapseToIslandHandler, PET_WIDTH, PET_HEIGHT } from './petWindow'
 import {
   initIsland,
   setIslandBusyGuard,
@@ -122,16 +122,25 @@ export function registerIpc(): void {
     getPetWindow()?.minimize()
   })
 
-  ipcMain.handle('win:maximize-toggle', () => {
+    ipcMain.handle('win:maximize-toggle', () => {
     const win = getPetWindow()
     if (!win) return
-    if (win.isMaximized()) {
-      win.unmaximize()
-      win.setResizable(false)
+    const { workArea } = screen.getPrimaryDisplay()
+    const [w, h] = win.getSize()
+    if (w > PET_WIDTH + 10) {
+      // 大屏态 → 回标准尺寸（原位缩回，缩放归 1）
+      const [x, y] = win.getPosition()
+      win.setBounds({ x, y, width: PET_WIDTH, height: PET_HEIGHT })
+      win.webContents.setZoomFactor(1)
     } else {
-      // 无边框 + resizable:false 时程序化最大化需要临时放开
-      win.setResizable(true)
-      win.maximize()
+      // 标准态 → 适配工作区（居中，等比缩放）
+      const z = Math.min(workArea.width / PET_WIDTH, workArea.height / PET_HEIGHT)
+      const W = Math.round(PET_WIDTH * z)
+      const H = Math.round(PET_HEIGHT * z)
+      const x = workArea.x + Math.max(0, Math.round((workArea.width - W) / 2))
+      const y = workArea.y + Math.max(0, Math.round((workArea.height - H) / 2))
+      win.setBounds({ x, y, width: W, height: H })
+      win.webContents.setZoomFactor(z)
     }
   })
 

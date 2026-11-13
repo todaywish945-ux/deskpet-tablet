@@ -117,6 +117,7 @@ export function createPetWindow(): BrowserWindow {
     petWindow.webContents.setZoomFactor(Math.min(w / PET_WIDTH, h / PET_HEIGHT))
   }
   petWindow.on('resize', fitZoom)
+  petWindow.webContents.setZoomFactor(1) // 清掉 Electron 按域名持久化的缩放，启动永远回到标准尺寸
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     petWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/pet/index.html`)
