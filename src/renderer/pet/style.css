@@ -1106,3 +1106,62 @@ img.char.pop-in {
   background: rgba(255, 255, 255, 0.18);
   border-radius: 2px;
 }
+
+/* ---------- 会话批量删除 ---------- */
+#manage-sessions-btn {
+  height: 26px;
+  margin-top: 4px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: rgba(200, 215, 226, 0.55);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+#manage-sessions-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(230, 240, 246, 0.8);
+}
+#batch-bar {
+  display: flex;
+  gap: 6px;
+}
+#batch-bar button {
+  flex: 1;
+  height: 26px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(220, 232, 240, 0.75);
+  font-size: 11px;
+  cursor: pointer;
+}
+#batch-bar button:hover:enabled {
+  background: rgba(255, 255, 255, 0.1);
+}
+#batch-bar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#batch-delete {
+  color: #ff8b8b;
+  border-color: rgba(255, 139, 139, 0.35);
+}
+#session-list.batch .session-item {
+  padding-left: 26px;
+}
+#session-list.batch .session-item .del {
+  display: none;
+}
+.session-item.batch-sel {
+  background: rgba(47, 214, 189, 0.1);
+  border-color: rgba(47, 214, 189, 0.35);
+}
+.session-item.batch-sel::before {
+  content: '✓';
+  position: absolute;
+  left: 10px;
+  color: #9df2e4;
+  font-size: 11px;
+}

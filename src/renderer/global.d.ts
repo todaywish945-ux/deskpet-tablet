@@ -31,7 +31,8 @@ declare global {
       listSessions: () => Promise<SessionStore>
       createSession: (topic: string) => Promise<ChatSession>
       openSession: (id: string) => Promise<ChatSession | null>
-      deleteSession: (id: string) => Promise<SessionStore>
+      deleteSession: (id: string) => Promise<SessionStore>,
+      deleteSessions: (ids: string[]) => Promise<SessionStore>
       beginCall: () => Promise<boolean>
       getProfile: () => Promise<UserProfile>
       deleteProfileFact: (factId: string) => Promise<UserProfile>

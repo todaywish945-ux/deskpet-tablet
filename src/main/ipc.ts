@@ -91,6 +91,17 @@ export function registerIpc(): void {
     return store
   })
 
+  ipcMain.handle('sessions:delete-many', (_event, ids: string[]) => {
+    const doomed = new Set(Array.isArray(ids) ? ids : [])
+    const store = loadSessions()
+    store.sessions = store.sessions.filter((s) => !doomed.has(s.id))
+    saveSessions(store)
+    const active = getActiveSessionId()
+    if (active && doomed.has(active)) setActiveSession(null)
+    return store
+  })
+
+
   /** 接通视频：由她围绕主界面定的主题先开口 */
   ipcMain.handle('call:begin', () => {
     const sessionId = getActiveSessionId()

@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('petAPI', {
   /** 打开历史会话并设为当前 */
   openSession: (id: string) => ipcRenderer.invoke('sessions:open', id),
   deleteSession: (id: string) => ipcRenderer.invoke('sessions:delete', id),
+  deleteSessions: (ids: string[]) => ipcRenderer.invoke('sessions:delete-many', ids),
   /** 接通视频：由她围绕会话主题先开口 */
   beginCall: () => ipcRenderer.invoke('call:begin'),
   /** 档案记忆：她长期记住的关于用户的事实 */
