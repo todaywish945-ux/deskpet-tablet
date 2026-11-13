@@ -71,7 +71,7 @@ async function runMoodUpdate(llm: LLMConfig): Promise<void> {
     for (const session of loadSessions().sessions) {
       for (const m of session.messages) {
         if (m.hidden || m.ts < start.getTime()) continue
-        lines.push(`${m.role === 'user' ? '用户' : '瞬光'}：${m.content}`)
+        lines.push(`${m.role === 'user' ? '用户' : '桌宠'}：${m.content}`)
       }
     }
     const dialogue = lines.join('\n').slice(-3000)

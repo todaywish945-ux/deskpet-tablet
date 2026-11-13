@@ -170,7 +170,7 @@ export function dialogueForExtraction(
   const picked: string[] = []
   let total = 0
   for (const m of [...messages].reverse()) {
-    const line = `${m.role === 'user' ? '用户' : '瞬光'}：${m.content}`
+    const line = `${m.role === 'user' ? '用户' : '桌宠'}：${m.content}`
     if (total + line.length > maxChars) break
     picked.unshift(line)
     total += line.length

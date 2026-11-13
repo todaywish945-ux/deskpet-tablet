@@ -362,7 +362,7 @@ async function renderSessions(): Promise<void> {
   if (store.sessions.length === 0) {
     const empty = document.createElement('div')
     empty.className = 'empty'
-    empty.textContent = '还没有会话\n定个话题，打给瞬光吧'
+    empty.textContent = '还没有会话\n定个话题，打给桌宠吧'
     sessionList.appendChild(empty)
     return
   }
