@@ -280,7 +280,7 @@ export class AnimationPlayer {
       const exitUrl = `${this.base}/animations/${tr.exit}`
       const dur =
         hidden.src === exitUrl && isFinite(hidden.duration) && hidden.duration > 0 ? hidden.duration : 0.7
-      const delay = Math.max(0, msUntilAudioEnd / 1000 - dur)
+      const delay = Math.min(Math.max(0, msUntilAudioEnd / 1000 - dur), 2.5) // 硬上限：音频时钟漂移时淡出最多延迟 2.5s，不再无限停在尾帧
       if (this.finishTimer) clearTimeout(this.finishTimer)
       this.finishTimer = setTimeout(() => {
         this.finishTimer = null
@@ -297,7 +297,7 @@ export class AnimationPlayer {
     this.loopingClip = false
     this.activeLoop = null
     const transitionMs = Math.min(600, Math.max(200, msUntilAudioEnd))
-    const delay = Math.max(0, msUntilAudioEnd - transitionMs)
+    const delay = Math.min(Math.max(0, msUntilAudioEnd - transitionMs), 2500) // 硬上限：收口淡出最多延迟 2.5s
     if (this.finishTimer) clearTimeout(this.finishTimer)
     this.finishTimer = setTimeout(() => {
       this.finishTimer = null
@@ -529,8 +529,8 @@ export class AnimationPlayer {
 
   // ---------- placeholder 模式 ----------
 
-  private static IDLE_STICKER = 'placeholder-idle.png'
-  private static TALK_STICKER = 'placeholder-talk.png'
+  private static IDLE_STICKER = '22-red-daily-listening.png'
+  private static TALK_STICKER = '23-red-daily-yes.png'
 
   private setupPlaceholder(): void {
     const img = document.createElement('img')
