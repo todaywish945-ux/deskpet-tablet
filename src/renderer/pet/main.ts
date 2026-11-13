@@ -18,6 +18,11 @@ const homeView = document.getElementById('home-view') as HTMLDivElement
 const callView = document.getElementById('call-view') as HTMLDivElement
 const sessionList = document.getElementById('session-list') as HTMLDivElement
 const newSessionBtn = document.getElementById('new-session-btn') as HTMLButtonElement
+const manageSessionsBtn = document.getElementById('manage-sessions-btn') as HTMLButtonElement
+const batchBar = document.getElementById('batch-bar') as HTMLDivElement
+const batchSelectAllBtn = document.getElementById('batch-select-all') as HTMLButtonElement
+const batchDeleteBtn = document.getElementById('batch-delete') as HTMLButtonElement
+const batchCancelBtn = document.getElementById('batch-cancel') as HTMLButtonElement
 const topicInput = document.getElementById('topic-input') as HTMLInputElement
 
 const topicView = document.getElementById('topic-view') as HTMLDivElement
@@ -356,6 +361,53 @@ function formatTime(ts: number): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`
 }
 
+// ---------- 会话批量删除 ----------
+let batchMode = false
+const selectedSessions = new Set<string>()
+
+function updateBatchBar(): void {
+  const total = sessionList.querySelectorAll('.session-item').length
+  batchDeleteBtn.textContent = `删除所选(${selectedSessions.size})`
+  batchDeleteBtn.disabled = selectedSessions.size === 0
+  batchSelectAllBtn.textContent = total > 0 && selectedSessions.size === total ? '全不选' : '全选'
+}
+
+function setBatchMode(on: boolean): void {
+  batchMode = on
+  selectedSessions.clear()
+  manageSessionsBtn.classList.toggle('hidden', on)
+  newSessionBtn.classList.toggle('hidden', on)
+  batchBar.classList.toggle('hidden', !on)
+  sessionList.classList.toggle('batch', on)
+  void renderSessions()
+}
+
+manageSessionsBtn.addEventListener('click', () => setBatchMode(true))
+batchCancelBtn.addEventListener('click', () => setBatchMode(false))
+batchSelectAllBtn.addEventListener('click', () => {
+  const items = [...sessionList.querySelectorAll<HTMLElement>('.session-item')]
+  const all = items.length > 0 && items.every((el) => el.dataset.sid && selectedSessions.has(el.dataset.sid))
+  for (const el of items) {
+    const sid = el.dataset.sid
+    if (!sid) continue
+    if (all) selectedSessions.delete(sid)
+    else selectedSessions.add(sid)
+  }
+  updateBatchBar()
+  void renderSessions()
+})
+batchDeleteBtn.addEventListener('click', () => {
+  const ids = [...selectedSessions]
+  if (ids.length === 0) return
+  if (!window.confirm(`删除选中的 ${ids.length} 个会话？（不可恢复）`)) return
+  void api.deleteSessions(ids).then(() => {
+    if (currentSession && ids.includes(currentSession.id)) resetComposer()
+    selectedSessions.clear()
+    updateBatchBar()
+    void renderSessions()
+  })
+})
+
 async function renderSessions(): Promise<void> {
   const store = await api.listSessions()
   sessionList.innerHTML = ''
@@ -369,6 +421,8 @@ async function renderSessions(): Promise<void> {
   for (const session of store.sessions) {
     const item = document.createElement('div')
     item.className = 'session-item' + (session.id === currentSession?.id ? ' active' : '')
+    item.dataset.sid = session.id
+    if (batchMode && selectedSessions.has(session.id)) item.classList.add('batch-sel')
 
     const title = document.createElement('div')
     title.className = 't'
@@ -382,16 +436,27 @@ async function renderSessions(): Promise<void> {
     del.textContent = '×'
     del.title = '删除会话'
 
-    item.append(title, time, del)
-    item.addEventListener('click', () => void selectSession(session.id))
-    del.addEventListener('click', (event) => {
-      event.stopPropagation()
-      if (!window.confirm(`删除会话「${session.title || '新的对话'}」？`)) return
-      void api.deleteSession(session.id).then(() => {
-        if (currentSession?.id === session.id) resetComposer()
-        void renderSessions()
+    if (batchMode) {
+      // 批量模式：点击条目=切换选中，单个 × 按钮隐藏
+      item.addEventListener('click', () => {
+        if (selectedSessions.has(session.id)) selectedSessions.delete(session.id)
+        else selectedSessions.add(session.id)
+        item.classList.toggle('batch-sel', selectedSessions.has(session.id))
+        updateBatchBar()
       })
-    })
+      item.append(title, time)
+    } else {
+      item.append(title, time, del)
+      item.addEventListener('click', () => void selectSession(session.id))
+      del.addEventListener('click', (event) => {
+        event.stopPropagation()
+        if (!window.confirm(`删除会话「${session.title || '新的对话'}」？`)) return
+        void api.deleteSession(session.id).then(() => {
+          if (currentSession?.id === session.id) resetComposer()
+          void renderSessions()
+        })
+      })
+    }
     sessionList.appendChild(item)
   }
 }
