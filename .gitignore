@@ -1,0 +1,8 @@
+node_modules/
+out/
+dist_app/
+logs/
+*.log
+tsconfig.*.tsbuildinfo
+scripts/试听.wav
+.DS_Store

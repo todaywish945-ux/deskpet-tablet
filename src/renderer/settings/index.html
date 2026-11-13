@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>平板桌宠 · 设置</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <main id="app">
+      <h1>平板桌宠 · 设置</h1>
+
+      <section>
+        <h2>角色皮肤</h2>
+        <label class="row">
+          <span>当前角色</span>
+          <select id="skin-select"></select>
+        </label>
+      </section>
+
+      <section>
+        <h2>平板窗口</h2>
+        <label class="row">
+          <span>窗口层级</span>
+          <select id="win-layer">
+            <option value="bottom">沉底 · 藏在所有应用之下，点平板浮上来</option>
+            <option value="top">置顶 · 悬浮在所有应用之上</option>
+          </select>
+        </label>
+        <label class="row">
+          <span>灵动岛（闲置自动收成屏幕顶部的胶囊）</span>
+          <input id="win-island" type="checkbox" />
+        </label>
+        <label class="row">
+          <span>失焦多久收起</span>
+          <select id="win-island-idle">
+            <option value="10">10 秒</option>
+            <option value="30">30 秒</option>
+            <option value="60">60 秒</option>
+          </select>
+        </label>
+      </section>
+
+      <section>
+        <h2>日常陪伴</h2>
+        <label class="row">
+          <span>她主动关心（闲置问候 / 早安晚安 / 心情周记）</span>
+          <input id="pro-active" type="checkbox" />
+        </label>
+        <label class="row">
+          <span>开机自启（打包安装版生效）</span>
+          <input id="app-autostart" type="checkbox" />
+        </label>
+        <label class="row">
+          <span>通话中她说话时你开口，她自动停下听</span>
+          <input id="call-bargein" type="checkbox" />
+        </label>
+      </section>
+
+      <section>
+        <h2>大模型（对话 · 智谱 GLM）</h2>
+        <label>
+          <span>Base URL</span>
+          <input id="llm-base" type="text" placeholder="https://open.bigmodel.cn/api/paas/v4" />
+        </label>
+        <label>
+          <span>API Key</span>
+          <input id="llm-key" type="password" placeholder="留空自动读环境变量 ZHIPU_API_KEY" />
+        </label>
+        <label>
+          <span>模型</span>
+          <input id="llm-model" type="text" placeholder="glm-5.3-flash" />
+        </label>
+      </section>
+
+      <section>
+        <h2>语音（说话的声音）</h2>
+        <label class="row">
+          <span>启用语音</span>
+          <input id="tts-enabled" type="checkbox" />
+        </label>
+        <label class="row">
+          <span>语音引擎</span>
+          <select id="tts-provider">
+            <option value="bailian">阿里云百炼 · 克隆音色（按量计费）</option>
+            <option value="gptsovits">GPT-SoVITS · 本地合成（免费）</option>
+          </select>
+        </label>
+
+        <div id="bailian-block">
+          <label>
+            <span>百炼 API Key</span>
+            <input id="tts-key" type="password" placeholder="sk-…（百炼控制台获取）" />
+          </label>
+          <label>
+            <span>语音模型</span>
+            <select id="tts-model">
+              <option value="qwen-audio-3.1-tts-flash">qwen-audio-3.1-tts-flash</option>
+              <option value="qwen-audio-3.0-tts-flash">qwen-audio-3.0-tts-flash</option>
+              <option value="qwen-audio-3.0-tts-plus">qwen-audio-3.0-tts-plus</option>
+            </select>
+          </label>
+          <label>
+            <span>克隆音色 ID</span>
+            <input id="tts-voice" type="text" placeholder="尚未注册，点下方按钮一键注册" readonly />
+          </label>
+          <div class="actions">
+            <button id="enroll-btn" type="button">① 用参考音频注册克隆音色</button>
+            <button id="test-btn" type="button">② 试听</button>
+          </div>
+          <p class="hint">
+            注册会用 assets/voice/reference.mp3 里的参考音频在你自己的百炼账号里创建音色，
+            一次性操作；换语音模型后需要重新注册。
+          </p>
+        </div>
+
+        <div id="gptsovits-block" hidden>
+          <label>
+            <span>服务地址</span>
+            <input id="gsv-api-base" type="text" placeholder="http://127.0.0.1:9880" />
+          </label>
+          <div class="actions">
+            <button id="gsv-probe-btn" type="button">检测本地服务</button>
+            <span id="gsv-status" class="gsv-status"></span>
+          </div>
+          <label>
+            <span>参考音频（3~10 秒清晰人声）</span>
+            <div class="row file-row">
+              <input id="gsv-ref-audio" type="text" placeholder="参考音频路径（3~10 秒清晰人声）" readonly />
+              <button id="gsv-pick-btn" type="button">浏览…</button>
+            </div>
+          </label>
+          <label>
+            <span>参考音频的文本内容</span>
+            <textarea id="gsv-ref-text" rows="3" placeholder="与参考音频说的一字不差，例如：…"></textarea>
+          </label>
+          <p class="hint">
+            先双击 GPT-SoVITS 整合包中的启动脚本启动本地服务（首次启动要加载模型，等
+            控制台出现服务地址再试）。参考音频越贴近目标音色，克隆效果越好。
+          </p>
+        </div>
+
+        <label>
+          <span>语速（0.5 – 2）</span>
+          <input id="tts-speed" type="number" min="0.5" max="2" step="0.05" />
+        </label>
+        <label>
+          <span>音量（0 – 1）</span>
+          <input id="tts-volume" type="number" min="0" max="1" step="0.05" />
+        </label>
+      </section>
+
+      <footer>
+        <span id="status"></span>
+        <button id="save-btn" type="button">保存设置</button>
+      </footer>
+    </main>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

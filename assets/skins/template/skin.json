@@ -1,0 +1,11 @@
+{
+  "id": "template",
+  "name": "模板皮肤",
+  "backend": "video",
+  "manifest": "animations/manifest.json",
+  "loopPoints": "animations/loop-points.json",
+  "reactions": "stickers/reactions.json",
+  "avatar": "avatar.png",
+  "persona": "prompts/character.md",
+  "emotions": {}
+}

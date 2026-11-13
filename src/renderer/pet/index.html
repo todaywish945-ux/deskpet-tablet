@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>桌宠</title>
+    <link rel="stylesheet" href="./style.css" />
+    <!-- Live2D 渲染后端三件套（顺序铁律：cubismcore → pixi → lipsyncpatch）；
+         非 Live2D 皮肤时只是多加载三个全局脚本，无副作用 -->
+    <script src="petasset://assets/vendor/live2dcubismcore.min.js"></script>
+    <script src="petasset://assets/vendor/pixi.min.js"></script>
+    <script src="petasset://assets/vendor/index.min.js"></script>
+  </head>
+  <body>
+    <div id="tablet">
+      <div class="camera" title=""></div>
+      <div id="screen">
+        <!-- 壁纸随皮肤：main.ts applySkin() 设 src（无壁纸的皮肤整张隐藏） -->
+        <img id="wallpaper" alt="" draggable="false" />
+        <div id="char-layer"></div>
+
+        <!-- 主界面：历史会话 + 今天想聊点什么 -->
+        <div id="home-view" class="view">
+          <aside id="home-side">
+            <div class="side-title">桌宠</div>
+            <button id="new-session-btn" type="button">＋ 新的会话</button>
+            <div id="session-list"></div>
+            <button id="profile-btn" type="button" title="她长期记住的关于你的事">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.9-9.7-9.2C.7 8.6 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4L12 9l2-1.6C14.8 6.1 16.2 5 18.2 5c3.4 0 5.1 3.6 3.5 6.8C19.5 16.1 12 21 12 21z"/></svg>
+              <span>她记住的</span>
+              <span id="profile-count" class="hidden"></span>
+            </button>
+          </aside>
+          <div id="home-main">
+            <!-- 新会话：定主题 -->
+            <div id="topic-view">
+              <div id="home-greet">今天想聊点什么？</div>
+              <div id="home-sub">定个话题，她来陪你——心事、焦虑、还是随便唠唠都行。</div>
+              <div id="topic-chips">
+                <button class="chip" type="button">随便聊聊</button>
+                <button class="chip" type="button">最近有点焦虑</button>
+                <button class="chip" type="button">今天发生的事</button>
+                <button class="chip" type="button">心事想找人说说</button>
+                <button class="chip" type="button">帮我放松一下</button>
+                <button class="chip" type="button">睡不着，想聊天</button>
+              </div>
+              <input id="topic-input" type="text" placeholder="想聊什么，直接写下来…" autocomplete="off" maxlength="40" />
+              <button id="start-call-btn" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 3.5v-10l-4 3.5z"/></svg>
+                <span>开始视频通话</span>
+              </button>
+            </div>
+            <!-- 已有会话：直接看这段对话 -->
+            <div id="session-view" class="hidden">
+              <div id="session-head">
+                <span id="session-title"></span>
+                <span id="session-when"></span>
+              </div>
+              <div id="session-preview"></div>
+              <button id="resume-call-btn" type="button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 3.5v-10l-4 3.5z"/></svg>
+                <span>继续视频通话</span>
+              </button>
+            </div>
+            <!-- 档案记忆面板：她长期记住的关于你的事 -->
+            <div id="profile-panel" class="hidden">
+              <div id="profile-head">
+                <span>她记住的关于你</span>
+                <button id="profile-close" type="button" title="关闭">×</button>
+              </div>
+              <div id="profile-list"></div>
+              <div id="profile-tip">每场通话结束后她会自己回忆整理；不想让她记的可以删掉。</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 通话界面 -->
+        <div id="call-view" class="view hidden">
+          <div id="statusbar">
+            <div class="left">
+              <span class="dot"></span>
+              <span class="name">桌宠</span>
+            </div>
+            <div class="right">
+              <span id="waveform" class="waveform"><i></i><i></i><i></i><i></i></span>
+              <span id="call-label">视频通话中</span>
+              <button id="history-toggle" type="button" title="聊天记录">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/></svg>
+              </button>
+            </div>
+          </div>
+
+          <div id="chat-area">
+            <div id="bubble" class="hidden"><span id="bubble-text"></span></div>
+            <div id="user-toast" class="hidden"></div>
+          </div>
+
+          <div id="call-bar">
+            <form id="inputbar">
+              <input id="chat-input" type="text" placeholder="跟瞬光说点什么…" autocomplete="off" maxlength="2000" />
+              <button id="send-btn" type="submit" title="发送">➤</button>
+            </form>
+            <button id="hangup-btn" class="call-icon" type="button" title="挂断">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 9c-1.6 0-3.15.25-4.6.72v3.1c0 .39-.23.74-.56.9-.98.49-1.87 1.12-2.66 1.85-.18.18-.43.28-.7.28-.28 0-.53-.11-.71-.29L.29 13.08c-.18-.17-.29-.42-.29-.7 0-.28.11-.53.29-.71C3.34 8.78 7.46 7 12 7s8.66 1.78 11.71 4.67c.18.18.29.43.29.71 0 .28-.11.53-.29.7l-2.48 2.48c-.18.18-.43.29-.71.29-.27 0-.52-.11-.7-.28-.79-.74-1.68-1.36-2.66-1.85-.33-.16-.56-.5-.56-.9v-3.1C15.15 9.25 13.6 9 12 9z"/></svg>
+            </button>
+          </div>
+
+          <aside id="history-panel">
+            <div class="panel-head">
+              <span>聊天记录</span>
+              <button id="history-close" type="button" title="收起">×</button>
+            </div>
+            <div id="history-list"></div>
+          </aside>
+        </div>
+      </div>
+      <div id="grip-top" data-drag="1"></div>
+      <div id="grip-left" data-drag="1"></div>
+      <div id="grip-right" data-drag="1"></div>
+      <div id="grip-bottom" data-drag="1"></div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

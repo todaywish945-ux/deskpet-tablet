@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>灵动岛</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <!-- 灵动岛（设计参考常见灵动岛）：胶囊 44 全圆角，卡片在正下方展开。
+         窗口四周 6px 是绘制余量，#island-root 用 fixed inset 贴住内容区。 -->
+    <div id="island-root">
+      <!-- 停靠细条：胶囊拖到屏幕边缘 40px 内自动变这样，鼠标靠近滑出胶囊 -->
+      <div id="strip">
+        <i id="strip-line"></i>
+        <img class="strip-avatar" src="petasset://assets/avatar.png" alt="" draggable="false" />
+        <i id="strip-dot" class="st-idle"></i>
+      </div>
+      <div id="capsule">
+        <div class="avatar"><img src="petasset://assets/avatar.png" alt="" draggable="false" /></div>
+        <span id="name">桌宠</span>
+        <div id="primary">
+          <span id="clock"></span>
+          <span id="msg" class="hidden"></span>
+        </div>
+        <div id="dot" class="st-idle"><i id="dot-core"></i><i id="dot-ring"></i></div>
+      </div>
+
+      <div id="card">
+        <div class="sec" id="sec-overview">
+          <img class="card-avatar" src="petasset://assets/avatar.png" alt="" draggable="false" />
+          <div class="ov-text">
+            <div class="ov-name">桌宠</div>
+            <div id="ov-status">在这里等你</div>
+          </div>
+          <div id="ov-clock"></div>
+        </div>
+        <div class="sec" id="sec-message">
+          <div class="sec-label">最近对你说</div>
+          <div id="last-msg">还没有聊过天</div>
+        </div>
+        <div class="sec" id="sec-actions">
+          <button id="btn-show" type="button">显示平板</button>
+          <button id="btn-chat" type="button">开始聊天</button>
+          <button id="btn-settings" type="button">设置</button>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>
