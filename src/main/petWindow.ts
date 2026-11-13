@@ -71,8 +71,8 @@ function loadSavedPosition(): { x: number; y: number } | null {
 
 function writePosition(win: BrowserWindow): void {
   try {
-    const [x, y] = win.getPosition()
-    writeFileSync(stateFile(), JSON.stringify({ x, y }), 'utf-8')
+    const b = win.isMaximized() ? win.getNormalBounds() : win.getBounds()
+    writeFileSync(stateFile(), JSON.stringify({ x: b.x, y: b.y }), 'utf-8')
   } catch {
     // 忽略
   }
@@ -110,6 +110,13 @@ export function createPetWindow(): BrowserWindow {
   petWindow.on('restore', pinIfBottom)
   petWindow.on('blur', pinIfBottom)
   petWindow.once('ready-to-show', () => petWindow?.show())
+  // 最大化时整体等比缩放：UI 是固定 628×484 的绝对布局，靠缩放适配大窗
+  const fitZoom = (): void => {
+    if (!petWindow || petWindow.isDestroyed()) return
+    const [w, h] = petWindow.getSize()
+    petWindow.webContents.setZoomFactor(Math.min(w / PET_WIDTH, h / PET_HEIGHT))
+  }
+  petWindow.on('resize', fitZoom)
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     petWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/pet/index.html`)

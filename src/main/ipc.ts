@@ -117,6 +117,28 @@ export function registerIpc(): void {
     return true
   })
 
+  // ---------- 窗口控制（右上角三键） ----------
+  ipcMain.handle('win:minimize', () => {
+    getPetWindow()?.minimize()
+  })
+
+  ipcMain.handle('win:maximize-toggle', () => {
+    const win = getPetWindow()
+    if (!win) return
+    if (win.isMaximized()) {
+      win.unmaximize()
+      win.setResizable(false)
+    } else {
+      // 无边框 + resizable:false 时程序化最大化需要临时放开
+      win.setResizable(true)
+      win.maximize()
+    }
+  })
+
+  ipcMain.handle('win:close', () => {
+    app.quit()
+  })
+
   // ---------- 档案记忆 ----------
 
   ipcMain.handle('profile:get', () => loadProfile())

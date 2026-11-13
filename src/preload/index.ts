@@ -32,6 +32,9 @@ contextBridge.exposeInMainWorld('petAPI', {
   /** 停止当前语音播报 */
   stop: () => ipcRenderer.invoke('pet:stop'),
   openSettings: () => ipcRenderer.invoke('app:open-settings'),
+  winMinimize: () => ipcRenderer.invoke('win:minimize'),
+  winMaximizeToggle: () => ipcRenderer.invoke('win:maximize-toggle'),
+  winClose: () => ipcRenderer.invoke('win:close'),
   /** 可选角色皮肤列表（设置页下拉） */
   listSkins: () => ipcRenderer.invoke('skins:list'),
   hidePet: () => ipcRenderer.invoke('app:hide-pet'),

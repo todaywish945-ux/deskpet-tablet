@@ -36,6 +36,10 @@
               <span>她记住的</span>
               <span id="profile-count" class="hidden"></span>
             </button>
+            <button id="settings-btn" type="button" title="设置">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 000-2l2.1-1.6a.5.5 0 00.1-.7l-2-3.4a.5.5 0 00-.6-.2l-2.5 1a7.6 7.6 0 00-1.7-1l-.4-2.6a.5.5 0 00-.5-.5h-4a.5.5 0 00-.5.4l-.4 2.6a7.6 7.6 0 00-1.7 1l-2.5-1a.5.5 0 00-.6.2l-2 3.4a.5.5 0 00.1.6L4.6 11a7.5 7.5 0 000 2l-2.1 1.6a.5.5 0 00-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 001.7 1l.4 2.6c0 .3.3.5.5.5h4c.2 0 .5-.2.5-.4l.4-2.6a7.6 7.6 0 001.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 00-.1-.7L19.4 13zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
+              <span>设置</span>
+            </button>
           </aside>
           <div id="home-main">
             <!-- 新会话：定主题 -->
@@ -78,6 +82,18 @@
               <div id="profile-tip">每场通话结束后她会自己回忆整理；不想让她记的可以删掉。</div>
             </div>
           </div>
+        </div>
+
+        <div id="win-controls">
+          <button id="win-min" type="button" title="最小化">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1 6h10" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+          </button>
+          <button id="win-max" type="button" title="最大化/还原">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" rx="1" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+          </button>
+          <button id="win-close" type="button" title="退出" class="close">
+            <svg viewBox="0 0 12 12" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.2" fill="none"/></svg>
+          </button>
         </div>
 
         <!-- 通话界面 -->

@@ -23,6 +23,14 @@ const batchBar = document.getElementById('batch-bar') as HTMLDivElement
 const batchSelectAllBtn = document.getElementById('batch-select-all') as HTMLButtonElement
 const batchDeleteBtn = document.getElementById('batch-delete') as HTMLButtonElement
 const batchCancelBtn = document.getElementById('batch-cancel') as HTMLButtonElement
+const winMinBtn = document.getElementById('win-min') as HTMLButtonElement
+const winMaxBtn = document.getElementById('win-max') as HTMLButtonElement
+const winCloseBtn = document.getElementById('win-close') as HTMLButtonElement
+const settingsBtn = document.getElementById('settings-btn') as HTMLButtonElement
+winMinBtn.addEventListener('click', () => void api.winMinimize())
+winMaxBtn.addEventListener('click', () => void api.winMaximizeToggle())
+winCloseBtn.addEventListener('click', () => void api.winClose())
+settingsBtn.addEventListener("click", () => void api.openSettings())
 const topicInput = document.getElementById('topic-input') as HTMLInputElement
 
 const topicView = document.getElementById('topic-view') as HTMLDivElement
@@ -103,7 +111,7 @@ function displayFilter(text: string): string {
 /** 点击落在可交互 UI 上时，不当作"点了屏幕人物"（动画层穿透后防误触） */
 function isInteractiveTarget(target: EventTarget | null): boolean {
   return !!(target as HTMLElement | null)?.closest?.(
-    'button, input, textarea, #call-bar, #statusbar, #bubble, #user-toast, #history-panel, #home-view, #profile-panel'
+    'button, input, textarea, #call-bar, #statusbar, #bubble, #user-toast, #history-panel, #home-view, #profile-panel, #win-controls, #settings-btn'
   )
 }
 

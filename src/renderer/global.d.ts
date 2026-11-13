@@ -6,6 +6,9 @@ declare global {
       send: (text: string) => Promise<void>
       stop: () => Promise<void>
       openSettings: () => Promise<void>
+      winMinimize: () => Promise<void>
+      winMaximizeToggle: () => Promise<void>
+      winClose: () => Promise<void>
       /** 可选角色皮肤列表（设置页下拉） */
       listSkins: () => Promise<{ id: string; name: string; backend: 'video' | 'live2d' }[]>
       hidePet: () => Promise<void>
