@@ -47,6 +47,9 @@ AI 智能体（例如百度搭子桌面端）：它自己下载框架、装环�
 最少只需填一个智谱 Key，断了发「继续」接着跑；
 需要分步控制或排障时再用 [PROMPTS-FOR-DUMATE.md](PROMPTS-FOR-DUMATE.md) 的指令卡。
 
+以上跑通的就是平板全部功能，到此为止完全可用。想让 **dsh 里的 agent 也指挥她**（说话/做表情/接视频/汇报任务进度）？
+装配套插件 [dsh-deskpet-tablet](https://github.com/todaywish945-ux/dsh-deskpet-tablet)——顺序必须是先框架后插件，插件 README 开头有说明。
+
 配置存于 `%APPDATA%/deskpet-tablet/data/config.json`，会话在同目录 `sessions.json`。
 
 ## 语音引擎怎么选
