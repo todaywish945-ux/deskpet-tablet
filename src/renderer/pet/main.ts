@@ -75,6 +75,7 @@ async function applySkin(force = false): Promise<void> {
   const container = document.getElementById('char-layer') as HTMLElement
   container.innerHTML = '' // 清掉上一后端的 canvas/video/img
   player.cancelFinishTimer()
+  clearSettlePoll()
   player = meta.backend === 'live2d'
     ? new Live2DPlayer(container, meta, base, () => pcm.level())
     : new AnimationPlayer(container, base)
@@ -280,8 +281,20 @@ api.on('pet:interrupt', () => {
   hadAudioThisTurn = false
   clearTalkWatchdog()
   player.cancelFinishTimer()
+  clearSettlePoll()
   stopVad()
 })
+
+  // 收口轮询：tts-end 后每 250ms 读真实剩余音频，≤450ms 或已停播才收口。
+  // AudioContext 挂起/漂移时 remaining 不再下降，轮询自动推迟——长句不会被提前
+  // 掐进待机，停播也不会停在尾帧假死。
+  let settlePollTimer: ReturnType<typeof setInterval> | null = null
+  function clearSettlePoll(): void {
+    if (settlePollTimer) {
+      clearInterval(settlePollTimer)
+      settlePollTimer = null
+    }
+  }
 
 api.on('pet:tts-end', () => {
   clearTalkWatchdog()
@@ -294,7 +307,14 @@ api.on('pet:tts-end', () => {
     return
   }
   // 收口倒排：按音频时间线还剩多久播完，提前留出过渡，语音结束瞬间正好闭嘴过渡到待机
-  player.finishTalkingAt(pcm.remainingMs)
+  clearSettlePoll()
+  settlePollTimer = setInterval(() => {
+    const rem = pcm.remainingMs
+    if (!pcm.busy || !Number.isFinite(rem) || rem <= 450) {
+      clearSettlePoll()
+      player.finishTalkingAt(Math.max(0, rem))
+    }
+  }, 250)
 })
 
 api.on('pet:tts-error', (message) => {
@@ -687,6 +707,7 @@ function hangup(): void {
   void api.stop()
   pcm.stop()
   player.cancelFinishTimer()
+  clearSettlePoll()
   waveform.classList.remove('on')
   callLabel.textContent = '视频通话中'
   showView('home')
