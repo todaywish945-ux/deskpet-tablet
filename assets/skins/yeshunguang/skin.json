@@ -1,0 +1,13 @@
+{
+  "id": "yeshunguang",
+  "name": "叶瞬光",
+  "backend": "video",
+  "manifest": "animations/manifest.json",
+  "loopPoints": "animations/loop-points.json",
+  "reactions": "stickers/reactions.json",
+  "avatar": "avatar.png",
+  "wallpaper": "wallpapers/dual-form-wallpaper-muted.png",
+  "tray": "stickers/22-red-daily-listening.png",
+  "persona": "prompts/character.md",
+  "emotions": {}
+}

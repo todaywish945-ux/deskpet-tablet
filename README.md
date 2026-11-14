@@ -3,8 +3,10 @@
 一台摆在桌面上的平板，你的 AI 角色「住」在里面——像一通一直没挂断的视频通话。
 打字或开口说话，她会思考、做出表情、用克隆的声音回应你。
 
-> **本仓库只包含框架，不含任何角色素材。** 角色动画、人设、语音三样东西由你自己准备
-> （见下方「三样自备素材」）。你放入的素材版权归原权利人，请自用、勿随框架再分发。
+> **开箱即完整形态**：仓库内置一个非官方同人皮肤——「叶瞬光」（角色形象、动画、贴纸、
+> 人设、语音参考**版权归米哈游所有**，仅供个人非商用学习，权利人要求下架将立即移除）。
+> 下载本仓库即得视频里的完整体验。想做你自己的角色？人设、动画、语音三样自备
+> （见下方「三样自备素材」），放入的素材归你自己负责。
 
 ## 功能特性
 
@@ -27,9 +29,8 @@
 | 形象动画 | 透明视频切片，或 Live2D 模型 | [ASSET-GUIDE.md](ASSET-GUIDE.md) §动画 / §Live2D |
 | 语音 | 一段参考音频（在线克隆），或本地训练的模型 | [ASSET-GUIDE.md](ASSET-GUIDE.md) §语音 |
 
-> 只想尽快跑起来？社区提供「叶瞬光」现成皮肤包（非官方同人，版权归米哈游）：
-> [deskpet-skin-yeshunguang](https://github.com/todaywish945-ux/deskpet-skin-yeshunguang) Releases 下载，
-> 解压放进皮肤目录即得完整形态。
+> **语音参考已内置**（`assets/voice/reference.mp3`）：装好百炼 Key 跑一条注册命令即有声音，
+> 无需另找音频。想换成别的声音再自备。
 
 ## 快速开始
 
@@ -95,7 +96,8 @@ src/renderer/pet/        平板 UI（AnimationPlayer 视频状态机 / Live2DPla
 src/renderer/island/     灵动岛渲染层
 src/renderer/settings/   设置页
 scripts/                 enroll-and-test.mjs 音色注册；loop-points.mjs 循环点计算（需 ffmpeg）
-assets/skins/template/   模板皮肤（空骨架，贴纸占位模式可直接跑）
+assets/skins/yeshunguang/ 内置同人皮肤（完整形态，默认）
+assets/skins/template/    模板皮肤（空骨架，做自己的角色从这里起步）
 assets/vendor/           PixiJS + Live2D 渲染（见 NOTICE-Live2D.md）
 ```
 
@@ -116,5 +118,9 @@ assets/vendor/           PixiJS + Live2D 渲染（见 NOTICE-Live2D.md）
 ## License 与边界
 
 - 框架代码：[MIT](LICENSE)
-- 你放入的角色素材、模型、参考音频：**不随本仓库分发**，版权归原权利人；克隆声音请确保你有权使用
+- **内置皮肤 `assets/skins/yeshunguang/` 为非官方同人资源**：角色「叶瞬光」及其中动画、
+  贴纸、壁纸、人设、语音参考的版权归米哈游（miHoYo）所有；部分素材源自开源项目
+  [shunguang-companion](https://github.com/Ou-morality-uni/shunguang-companion)。仅供个人非商用学习，
+  严禁商业用途；权利人要求下架将立即移除
+- 你放入的其他角色素材、模型、参考音频：版权归原权利人；克隆声音请确保你有权使用
 - 本项目定位个人非商用；接入的模型服务请遵守各平台条款

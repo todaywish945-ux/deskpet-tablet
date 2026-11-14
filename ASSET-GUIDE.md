@@ -4,12 +4,13 @@
 本文说明每种素材的位置、格式与行为。所有路径相对皮肤目录（内置皮肤在 `assets/skins/<id>/`，
 用户自装皮肤在 `%APPDATA%/deskpet-tablet/skins/<id>/`——**优先级更高，升级框架不丢失**）。
 
-## 现成皮肤包（不想自己做形象的）
+## 内置皮肤：叶瞬光（非官方同人）
 
-[deskpet-skin-yeshunguang](https://github.com/todaywish945-ux/deskpet-skin-yeshunguang) 提供
-「叶瞬光」完整皮肤包（非官方同人资源，角色与素材版权归米哈游）：Releases 下载 zip，
-解压把 `yeshunguang/` 放进皮肤目录即可，动画、贴纸、壁纸、人设全齐，另附语音参考音频。
-贴纸、参考音频、人设底稿也可从开源项目 [shunguang-companion](https://github.com/Ou-morality-uni/shunguang-companion) 自行获取。
+仓库自带一个开箱即用的完整皮肤 `assets/skins/yeshunguang/`——动画切片、表情贴纸、壁纸、
+人设、头像全齐，默认启用，下载即得完整形态。**角色与素材版权归米哈游（miHoYo）所有，
+仅供个人非商用学习，严禁商业用途；权利人要求下架将立即移除。**
+部分素材（贴纸、参考音频、人设底稿）源自开源项目 [shunguang-companion](https://github.com/Ou-morality-uni/shunguang-companion)。
+想换成你自己的角色？以下章节就是素材规格。
 
 ## 皮肤包结构
 

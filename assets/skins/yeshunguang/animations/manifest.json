@@ -1,0 +1,27 @@
+{
+  "idle": [
+    "idle_base.mp4"
+  ],
+  "talk": [
+    "talk_standby.mp4",
+    "talk_04_loop.mp4",
+    "talk_squint.mp4",
+    "talk_face.mp4"
+  ],
+  "settle": {},
+  "emotions": {},
+  "transitions": {
+    "talk_04_loop.mp4": {
+      "enter": "idle_to_fist.mp4",
+      "exit": "fist_to_idle.mp4"
+    },
+    "talk_face.mp4": {
+      "enter": "idle_to_face2.mp4",
+      "exit": "face_to_idle.mp4"
+    },
+    "talk_squint.mp4": {
+      "enter": "idle_to_squint.mp4",
+      "exit": "squint_to_idle.mp4"
+    }
+  }
+}

@@ -127,7 +127,7 @@ export function userSkinsRoot(): string {
 
 /** 在两个根下找皮肤目录：userData/skins 优先于打包内置 */
 export function activeSkinDir(config?: AppConfig): string {
-  const id = (config ?? loadConfig()).character?.skin || 'template'
+  const id = (config ?? loadConfig()).character?.skin || 'yeshunguang'
   const candidates = [join(userSkinsRoot(), id), join(assetRoot(), 'skins', id)]
   for (const dir of candidates) {
     if (existsSync(join(dir, 'skin.json'))) return dir

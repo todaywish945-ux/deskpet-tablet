@@ -164,7 +164,7 @@ export const DEFAULT_CONFIG: AppConfig = {
     islandIdleSeconds: 10
   },
   character: {
-    skin: 'template'
+    skin: 'yeshunguang'
   },
   proactive: {
     enabled: true

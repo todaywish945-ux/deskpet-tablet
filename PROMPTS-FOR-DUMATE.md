@@ -100,7 +100,7 @@ setx ZHIPU_API_KEY "<Key>"
 
 ## 卡3 · 装角色皮肤（人设 + 动画 + 表情贴纸）
 
-> 框架用「皮肤包」组织一切角色素材。仓库自带 `assets/skins/template` 空骨架——没有动画素材时自动进入贴纸占位模式，流程照常可跑。
+> 框架用「皮肤包」组织一切角色素材。仓库内置的 `assets/skins/yeshunguang`（叶瞬光，非官方同人）开箱即用——只想用她就跳过本卡，设置里选她即可。想做自己的角色：仓库自带 `assets/skins/template` 空骨架，没有动画素材时自动进入贴纸占位模式，流程照常可跑。
 
 **第 1 步 · 建立你的皮肤**：
 
@@ -233,9 +233,9 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
       把它覆盖为 assets\voice\reference.mp3，setx DASHSCOPE_API_KEY 后
       运行 node scripts/enroll-and-test.mjs，最后告诉我试听.wav 在哪。
 第3步 填智谱 Key：setx ZHIPU_API_KEY "<Key>"。
-第4步 建皮肤：复制 assets\skins\template 为 assets\skins\<id>，改 skin.json 的
-      id 和 name，人设用 <我的人设文件路径> 覆盖其 prompts\character.md
-      （素材规格先读 ASSET-GUIDE.md），在设置里把皮肤切成它。
+第4步 皮肤确认：内置叶瞬光皮肤在 assets\skins\yeshunguang（开箱即用），确认其
+      skin.json 存在并把 config.json 的 character.skin 设为 yeshunguang
+      （我给了自己的素材则按 ASSET-GUIDE 放进 template 并切到 template）。
 第5步 启动验收：npm run dev，确认平板窗口出现、打字有回复、说话有声音。
 
 完成后给我一份清单：每步的结果 + 当前 config.json 的 tts/llm/character 三段内容（Key 打码）。
