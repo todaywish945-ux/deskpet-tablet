@@ -125,8 +125,7 @@ assets/vendor/           PixiJS + Live2D 渲染（见 NOTICE-Live2D.md）
 
 - 框架代码：[MIT](LICENSE)
 - **内置皮肤 `assets/skins/yeshunguang/` 为非官方同人资源**：角色「叶瞬光」及其中动画、
-  贴纸、壁纸、人设、语音参考的版权归米哈游（miHoYo）所有；部分素材源自开源项目
-  [shunguang-companion](https://github.com/Ou-morality-uni/shunguang-companion)。仅供个人非商用学习，
+  贴纸、壁纸、人设、语音参考的版权归米哈游（miHoYo）所有。仅供个人非商用学习，
   严禁商业用途；权利人要求下架将立即移除
 - 你放入的其他角色素材、模型、参考音频：版权归原权利人；克隆声音请确保你有权使用
 - 本项目定位个人非商用；接入的模型服务请遵守各平台条款

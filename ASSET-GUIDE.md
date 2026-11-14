@@ -9,7 +9,6 @@
 仓库自带一个开箱即用的完整皮肤 `assets/skins/yeshunguang/`——动画切片、表情贴纸、壁纸、
 人设、头像全齐，默认启用，下载即得完整形态。**角色与素材版权归米哈游（miHoYo）所有，
 仅供个人非商用学习，严禁商业用途；权利人要求下架将立即移除。**
-部分素材（贴纸、参考音频、人设底稿）源自开源项目 [shunguang-companion](https://github.com/Ou-morality-uni/shunguang-companion)。
 想换成你自己的角色？以下章节就是素材规格。
 
 ## 皮肤包结构
