@@ -117,7 +117,7 @@ export function createIslandWindow(): BrowserWindow {
   if (process.env['ELECTRON_RENDERER_URL']) {
     void win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/island/index.html`)
   } else {
-    void win.loadFile(join(__dirname, '../renderer/island.html'))
+    void win.loadFile(join(__dirname, '../renderer/island/index.html'))
   }
   win.on('closed', () => {
     win = null

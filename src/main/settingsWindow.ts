@@ -25,7 +25,7 @@ export function createSettingsWindow(): BrowserWindow {
   if (process.env['ELECTRON_RENDERER_URL']) {
     settingsWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/settings/index.html`)
   } else {
-    settingsWindow.loadFile(join(__dirname, '../renderer/settings.html'))
+    settingsWindow.loadFile(join(__dirname, '../renderer/settings/index.html'))
   }
 
   settingsWindow.on('closed', () => {

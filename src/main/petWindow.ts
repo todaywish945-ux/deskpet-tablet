@@ -126,10 +126,10 @@ export function createPetWindow(): BrowserWindow {
     // localhost 是安全上下文，麦克风代录才能在桌宠进程里工作。加载失败回退 loadFile。
     petWindow.loadURL(`http://127.0.0.1:${pluginPort()}/app/pet/index.html`)
     petWindow.webContents.on('did-fail-load', (_event, _code, _desc, url, isMain) => {
-      if (isMain && url.includes('/app/pet/')) petWindow?.loadFile(join(__dirname, '../renderer/pet.html'))
+      if (isMain && url.includes('/app/pet/')) petWindow?.loadFile(join(__dirname, '../renderer/pet/index.html'))
     })
   } else {
-    petWindow.loadFile(join(__dirname, '../renderer/pet.html'))
+    petWindow.loadFile(join(__dirname, '../renderer/pet/index.html'))
   }
 
   // 渲染层 console → 看门狗日志：打包版 stdout 没人能看，排查远程功能全靠这个文件
