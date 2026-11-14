@@ -10,6 +10,10 @@ import { createSettingsWindow } from './settingsWindow'
 import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
 import { assetRoot, activeSkinDir } from './services/store'
 
+// 统一配置目录：打包版 productName 是中文（平板桌宠）、dev 是包名（deskpet-tablet），
+// 显式钉到同一路径，README/AUTOSETU 里的 %APPDATA%\deskpet-tablet 对两种运行方式都成立
+app.setPath('userData', join(app.getPath('appData'), 'deskpet-tablet'))
+
 // 自定义资源协议：渲染层通过 petasset://assets/... 访问 assets 目录（视频/图片/清单）
 protocol.registerSchemesAsPrivileged([
   {
