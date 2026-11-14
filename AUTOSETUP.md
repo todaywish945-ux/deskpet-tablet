@@ -24,7 +24,7 @@ Key 只在要声音时才需要第二把；什么都不填也能先文字聊天�
 参考音频：<完整路径，单人清晰人声；bailian 建议 ≥10 秒 / gptsovits 需 3~10 秒；没有写「无」= 暂时文字聊天>
 GPT-SoVITS 整合包目录：<仅 gptsovits 时填；纯英文路径，整合包需自己提前下载解压>
 人设文件：<可选，.md 文本路径；没有写「无」= 用内置通用人设「阿板」，开箱就能聊>
-素材文件夹：<可选，装头像/动画/贴纸的文件夹；没有写「无」= 占位模式>
+素材文件夹：<可选，装头像/动画/贴纸的文件夹；想直接用现成的叶瞬光形象就写「皮肤包」；没有写「无」= 占位模式>
 ```
 
 > **给 UP 主**：发布教程时，把【框架下载地址】填好后将整段总控指令放进视频置顶评论——
@@ -91,6 +91,19 @@ GPT-SoVITS 整合包目录：<仅 gptsovits 时填；纯英文路径，整合包
    manifest.json 引用的每个视频文件都必须真实存在，对不上就改文件名。
 3. 两项都是无：跳过——内置人设「阿板」+ 占位贴图直接可用，什么都不用放。
 验收：persona 指向的文件存在；（若放了 manifest）引用文件全部存在。
+
+【阶段 3.5 · 可选：装现成的叶瞬光皮肤包】
+仅当我在【我的信息】里写了「皮肤包」时执行；没写就跳过。
+1. 访问 https://github.com/todaywish945-ux/deskpet-skin-yeshunguang 的 Releases 页，
+   下载最新 zip（约 240MB）到下载文件夹；
+2. 解压，把里面的 yeshunguang\ 文件夹整个复制到
+   %APPDATA%\deskpet-tablet\skins\（目录不存在就创建）；
+3. zip 里的 voice\reference.mp3 是语音克隆参考音频——若阶段 2 我没有自己的参考音频，
+   把它复制覆盖为 <框架目录>\assets\voice\reference.mp3 再执行注册；有就跳过；
+4. 读 %APPDATA%\deskpet-tablet\data\config.json，把 character.skin 改为 "yeshunguang"，
+   其他字段不动。
+验收：skins\yeshunguang\skin.json 存在且 config.json 的 character.skin 为 yeshunguang。
+（版权说明：该皮肤包为非官方同人资源，角色与素材版权归米哈游，仅供个人非商用学习。）
 
 【阶段 4 · 启动与冒烟】
 1. 在框架目录用**新窗口**启动 npm run dev（别阻塞你的终端），等 30 秒。

@@ -27,6 +27,10 @@
 | 形象动画 | 透明视频切片，或 Live2D 模型 | [ASSET-GUIDE.md](ASSET-GUIDE.md) §动画 / §Live2D |
 | 语音 | 一段参考音频（在线克隆），或本地训练的模型 | [ASSET-GUIDE.md](ASSET-GUIDE.md) §语音 |
 
+> 只想尽快跑起来？社区提供「叶瞬光」现成皮肤包（非官方同人，版权归米哈游）：
+> [deskpet-skin-yeshunguang](https://github.com/todaywish945-ux/deskpet-skin-yeshunguang) Releases 下载，
+> 解压放进皮肤目录即得完整形态。
+
 ## 快速开始
 
 ```bash
