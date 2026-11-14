@@ -44,9 +44,9 @@ GPT-SoVITS 整合包目录：<仅 gptsovits 时填；纯英文路径，整合包
 
 【我的信息】
 智谱 API Key：<必填，对话要用；bigmodel.cn 注册获取>
-百炼 API Key：<可选；阿里云百炼平台申请，在线克隆的声音，填了就走阶段 3>
-本地语音（GPT-SoVITS）：<可选；完全免费但需要英伟达 N 卡和 GPT-SoVITS 整合包。
-要本地语音填「是」，并在下一行给整合包目录（纯英文路径）；不填默认走百炼/无声音>
+配音方式：<可留空——AI 会检测你的电脑条件后给你选项；也可直接写
+A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不配声音>
+整合包目录：<仅 B 需要；GPT-SoVITS 整合包解压后的目录，纯英文路径>
 
 【进度管理（最先做）】
 进度文件 %APPDATA%\deskpet-tablet\配置进度.json，格式 {"stage":"","status":"done|failed","evidence":""}。
@@ -71,32 +71,43 @@ GPT-SoVITS 整合包目录：<仅 gptsovits 时填；纯英文路径，整合包
 3. 重新启动平板桌宠。
 验收：访问 http://127.0.0.1:37820/health 返回 JSON 且 "app":"deskpet-tablet"。
 
-【阶段 3 · 开通在线声音（仅当我给了百炼 Key 且本地语音=无）】
-1. 打开设置窗口（右键平板边框 → 设置，或托盘图标右键 → 设置）。
-2. 带我在语音一栏依次点击「① 用参考音频注册克隆音色」和「② 试听」——
-   参考音频已内置，不用找；注册成功会有提示，告诉我试听效果。
-3. 没给百炼 Key 或选了本地语音：跳过本阶段。
-验收：注册成功提示出现，或我确认听到了试听。
+【阶段 3 · 配音方式：先检测条件，再让我选择】
+三种方式：A 在线克隆（百炼，按量计费，无需显卡）/ B 本地 GPT-SoVITS（完全免费，需英伟达 N 卡）
+/ C 暂不配声音（纯文字聊天）。
+1. 先自己静默检测，不打扰我：
+   a. 有无 N 卡：运行 nvidia-smi --query-gpu=name --format=csv,noheader ——有输出=✓，报错=✗；
+   b. 本地引擎：我在【我的信息】给了整合包目录则检查「目录存在且路径为纯英文」；没给=✗；
+   c. 在线克隆：我在【我的信息】给了百炼 Key=✓，没给=✗。
+2. 把检测结果连同三种方式的条件一起告诉我（每条标 ✓/✗），让我选 A/B/C。
+   若我在【我的信息】里已明确选了方式，直接采用，不再重复问。
+3. 按我的选择执行：
+   ▶ A 在线克隆：
+     - 百炼 Key ✓：打开设置窗口（右键平板边框 → 设置），带我依次点
+       「① 用参考音频注册克隆音色」「② 试听」——参考音频已内置，不用找；
+     - 我想用 A 但没有百炼 Key：带我开通——浏览器打开 bailian.console.aliyun.com，
+       引导我开通服务并创建 API Key，我贴给你后写入 tts.apiKey，再走上一条。
+   ▶ B 本地 GPT-SoVITS：
+     - N卡 ✓ + 整合包 ✓：退出平板桌宠 → 修改 %APPDATA%\deskpet-tablet\data\config.json
+       的 tts 段：
+       "provider": "gptsovits",
+       "gsvApiBase": "http://127.0.0.1:9880",
+       "gsvRefAudio": "<安装目录>\resources\assets\voice\gsv-ref.wav",
+       "gsvRefText": "亦余心，道心唯居，剑法自然。",
+       "gsvPromptLang": "zh", "gsvTextLang": "zh",
+       "gsvLauncherPath": "<整合包目录里的启动脚本路径>"
+       参考音频已内置在安装目录，不用另找；其他字段不动 → 重启平板桌宠；
+     - N卡 ✓ 但整合包 ✗：告诉我"需要下载 GPT-SoVITS 整合包（约 10GB，N卡专用）"——
+       下载途径：https://github.com/RVC-Boss/GPT-SoVITS/releases 页找 Windows 整合包（.7z），
+       国内下载慢就在链接前加 https://gh-proxy.com/ 前缀；解压到纯英文路径（如 D:\GPT-SoVITS），
+       然后把目录告诉我，我下好说一声"下好了"你再继续，期间不要自行下载 10GB 大文件；
+     - 无 N卡 ✗：明确告诉我"你的电脑没有英伟达显卡，本地引擎用不了"，建议 A 或 C。
+   ▶ C：跳过语音配置，说明纯文字聊天已可用、以后随时能补。
+验收：A → 注册成功提示出现，或我确认听到了试听；
+      B → 她说第一句话时框架会自动拉起本地服务（首次等 1~2 分钟属正常），有声即过，
+          失败读 %APPDATA%\deskpet-tablet\logs\gsv-autostart.log 最后 30 行贴给我；
+      C → 本阶段直接通过。
 
-【阶段 4 · 可选：切换本地语音引擎 GPT-SoVITS（免费，需 N 卡）】
-仅当【我的信息】里「本地语音」=是 且我给了整合包目录时执行；否则跳过。
-1. 检查整合包目录存在且路径为纯英文；不存在 → 告诉我需要：英伟达显卡（N卡）+
-   GPT-SoVITS 整合包（约 10GB，去官方发布页下载解压），停下等我提供目录。
-2. 退出平板桌宠（托盘右键 → 退出桌宠）。
-3. 修改 %APPDATA%\deskpet-tablet\data\config.json 的 tts 段：
-   "provider": "gptsovits",
-   "gsvApiBase": "http://127.0.0.1:9880",
-   "gsvRefAudio": "<安装目录>\resources\assets\voice\gsv-ref.wav",
-   "gsvRefText": "亦余心，道心唯居，剑法自然。",
-   "gsvPromptLang": "zh",
-   "gsvTextLang": "zh",
-   "gsvLauncherPath": "<整合包目录里的启动脚本路径>"
-   参考音频已内置在安装目录里，不用另找；其他字段不许动；改完读回给我确认。
-4. 重新启动平板桌宠。
-验收：她说话有声音；第一次开口时框架会自动拉起本地服务，等 1~2 分钟属正常。
-失败：读 %APPDATA%\deskpet-tablet\logs\gsv-autostart.log 最后 30 行贴给我。
-
-【阶段 5 · 最终验收与报告】
+【阶段 4 · 最终验收与报告】
 1. 让我人眼确认三件事：桌面出现平板、发一条消息她有回复、（配了声音）她开口有声音。
 2. 给我最终报告：每阶段结果 + config.json 的 llm/tts 两段内容（Key 打码）。
 
