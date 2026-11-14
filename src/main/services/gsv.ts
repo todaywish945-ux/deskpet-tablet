@@ -76,3 +76,42 @@ export async function ensureGsvService(config: TTSConfig): Promise<boolean> {
   console.error('[gsv] 语音服务不在线，已后台拉起 python（日志：', log, '）')
   return true
 }
+
+/** 启动预热：拉起本地语音服务并空合成一小句，把模型先装进显存——用户第一句话不再冷启动 */
+export async function warmUpGsv(config: TTSConfig): Promise<void> {
+  if (!config.enabled || config.provider !== 'gptsovits') return
+  const base = (config.gsvApiBase || 'http://127.0.0.1:9880').replace(/\/+$/, '')
+  try {
+    const launched = await ensureGsvService(config)
+    if (launched) {
+      // 刚拉起整合包：等服务真正开始监听（最多约 150s），再做预热合成
+      for (let i = 0; i < 50; i++) {
+        if (await isGsvOnline(base)) break
+        await new Promise((r) => setTimeout(r, 3000))
+      }
+    }
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 120_000) // 冷启动含模型加载，放宽到 120s
+    const response = await fetch(`${base}/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        text: '你好',
+        text_lang: config.gsvTextLang || 'zh',
+        ref_audio_path: config.gsvRefAudio,
+        prompt_text: config.gsvRefText,
+        prompt_lang: config.gsvPromptLang || 'zh',
+        text_split_method: 'cut0',
+        streaming_mode: false,
+        media_type: 'wav',
+        speed_factor: Math.min(1.65, Math.max(0.6, config.speed || 1))
+      })
+    })
+    await response.arrayBuffer().catch(() => undefined) // 音频直接丢弃，只为预热
+    clearTimeout(timer)
+    console.log('[gsv] 预热完成，模型已就绪')
+  } catch (error) {
+    console.log('[gsv] 预热未完成（不影响使用，首次合成仍会自动拉起服务）:', (error as Error).message)
+  }
+}

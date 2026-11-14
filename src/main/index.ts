@@ -8,7 +8,8 @@ import { createIslandWindow } from './islandWindow'
 import { createTray } from './tray'
 import { createSettingsWindow } from './settingsWindow'
 import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
-import { assetRoot, activeSkinDir } from './services/store'
+import { assetRoot, activeSkinDir, loadConfig } from './services/store'
+import { warmUpGsv } from './services/gsv'
 
 // 统一配置目录：打包版 productName 是中文（平板桌宠）、dev 是包名（deskpet-tablet），
 // 显式钉到同一路径，README/AUTOSETU 里的 %APPDATA%\deskpet-tablet 对两种运行方式都成立
@@ -125,6 +126,7 @@ if (!gotLock) {
     registerIpc()
     startPluginBridge() // 桥先起：打包版桌宠窗口要从桥加载页面（见 petWindow.ts）
     createPetWindow()
+    void warmUpGsv(loadConfig().tts) // 预热本地语音：模型先装显存，用户第一句话不再冷启动
     initIsland() // 灵动岛闲置计时挂在桌宠窗口的 blur/focus 上（窗口已建好）
     createIslandWindow() // 独立岛窗口：闲置收起平板后亮出胶囊
     createTray()
