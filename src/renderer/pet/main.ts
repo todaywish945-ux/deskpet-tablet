@@ -339,11 +339,13 @@ api.on('pet:config-changed', () => {
 })
 
 // 控制桥上有远程面板（DSH 里的内嵌通话卡）接管声音时，平板这边静音，免得双声道；
-// 只关音量不停播报：动画/口型/状态机照常，面板一关声音自动还回来
+// 只关音量不停播报：动画/口型/状态机照常，面板一关声音自动还回来。
+// 静音必须留痕——"张嘴说不出话"的头号来源就是它，无声时让用户当场知道声音去哪了
 let bridgeOwnsAudio = false
 api.on('pet:bridge-audio-sink', (on) => {
   bridgeOwnsAudio = on === true
   pcm.setVolume(bridgeOwnsAudio ? 0 : 1)
+  showUserToast(bridgeOwnsAudio ? '声音正在 dsh 面板播放（平板静音中）' : '声音回到平板了')
 })
 
 // ---------- 灵动岛（独立岛窗口）----------
@@ -412,7 +414,7 @@ function setBatchMode(on: boolean): void {
 
 manageSessionsBtn.addEventListener('click', () => setBatchMode(true))
 batchCancelBtn.addEventListener('click', () => setBatchMode(false))
-batchSelectAllBtn.addEventListener('click', () => {
+batchSelectAllBtn.addEventListener("click", () => {
   const items = [...sessionList.querySelectorAll<HTMLElement>('.session-item')]
   const all = items.length > 0 && items.every((el) => el.dataset.sid && selectedSessions.has(el.dataset.sid))
   for (const el of items) {
@@ -424,7 +426,7 @@ batchSelectAllBtn.addEventListener('click', () => {
   updateBatchBar()
   void renderSessions()
 })
-batchDeleteBtn.addEventListener('click', () => {
+batchDeleteBtn.addEventListener("click", () => {
   const ids = [...selectedSessions]
   if (ids.length === 0) return
   if (!window.confirm(`删除选中的 ${ids.length} 个会话？（不可恢复）`)) return
@@ -442,7 +444,7 @@ async function renderSessions(): Promise<void> {
   if (store.sessions.length === 0) {
     const empty = document.createElement('div')
     empty.className = 'empty'
-    empty.textContent = '还没有会话\n定个话题，打给桌宠吧'
+    empty.textContent = '还没有会话\n定个话题，打给瞬光吧'
     sessionList.appendChild(empty)
     return
   }
@@ -497,7 +499,7 @@ async function selectSession(id: string): Promise<void> {
   await renderSessions()
 }
 
-let avatarUrl = 'petasset://assets/avatar.png'
+let avatarUrl = 'petasset://assets/avatar-yeshunguang.png'
 const USER_AVATAR_SVG =
   '<svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.3 0-8 1.7-8 5v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1c0-3.3-4.7-5-8-5z"/></svg>'
 
@@ -858,6 +860,7 @@ function armBargeIn(): void {
           stream?.getTracks().forEach((track) => track.stop())
           pcm.stop()
           void api.stop() // 主进程取消整轮，pet:interrupt 会清画面状态
+          showUserToast('听到你说话了，我先停一下（可在设置里关闭自动打断）')
         }
       } else {
         vadLoudSince = 0
@@ -913,6 +916,26 @@ document.addEventListener('mousedown', (event) => {
   window.addEventListener('mouseup', end)
   window.addEventListener('pointerup', end)
 })
+
+// ---------- 前台自愈 ----------
+// Windows 下窗口可能落进"看得见但页面没激活"的死状态（沉底/唤回和全屏游戏
+// 抢前台打架）：点输入框没光标、打字全落进别的窗口，用户只能靠截屏切一次
+// 前台救活。这里兜底：点击落进页面 120ms 后仍报告失焦，就请主进程补一次
+// 激活——这次点击本身已把前台权交给本进程，SetForegroundWindow 必然成功。
+document.addEventListener(
+  'mousedown',
+  () => {
+    if (document.hasFocus()) return
+    setTimeout(() => {
+      if (document.hasFocus()) return
+      console.log('[self-heal] 页面失焦但被点击：请求主进程激活窗口')
+      api.focusWindow()
+      const el = document.activeElement
+      if (el instanceof HTMLElement && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) el.focus()
+    }, 120)
+  },
+  true
+)
 
 document.addEventListener('contextmenu', (event) => {
   const target = event.target as HTMLElement

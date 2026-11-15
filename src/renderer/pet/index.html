@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>桌宠</title>
+    <title>叶瞬光</title>
     <link rel="stylesheet" href="./style.css" />
     <!-- Live2D 渲染后端三件套（顺序铁律：cubismcore → pixi → lipsyncpatch）；
          非 Live2D 皮肤时只是多加载三个全局脚本，无副作用 -->
@@ -22,7 +22,7 @@
         <!-- 主界面：历史会话 + 今天想聊点什么 -->
         <div id="home-view" class="view">
           <aside id="home-side">
-            <div class="side-title">桌宠</div>
+            <div class="side-title">叶瞬光</div>
             <button id="new-session-btn" type="button">＋ 新的会话</button>
             <button id="manage-sessions-btn" type="button">管理</button>
             <div id="batch-bar" class="hidden">
@@ -54,7 +54,7 @@
                 <button class="chip" type="button">帮我放松一下</button>
                 <button class="chip" type="button">睡不着，想聊天</button>
               </div>
-              <input id="topic-input" type="text" placeholder="想聊什么，直接写下来…" autocomplete="off" maxlength="40" />
+              <input id="topic-input" type="text" placeholder="想聊什么，直接写下来…" autocomplete="off" />
               <button id="start-call-btn" type="button">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 3.5v-10l-4 3.5z"/></svg>
                 <span>开始视频通话</span>
@@ -101,7 +101,7 @@
           <div id="statusbar">
             <div class="left">
               <span class="dot"></span>
-              <span class="name">桌宠</span>
+              <span class="name">叶瞬光</span>
             </div>
             <div class="right">
               <span id="waveform" class="waveform"><i></i><i></i><i></i><i></i></span>
@@ -119,7 +119,7 @@
 
           <div id="call-bar">
             <form id="inputbar">
-              <input id="chat-input" type="text" placeholder="跟桌宠说点什么…" autocomplete="off" maxlength="2000" />
+              <input id="chat-input" type="text" placeholder="跟瞬光说点什么…" autocomplete="off" maxlength="2000" />
               <button id="send-btn" type="submit" title="发送">➤</button>
             </form>
             <button id="hangup-btn" class="call-icon" type="button" title="挂断">

@@ -20,6 +20,16 @@ export function getPetWindow(): BrowserWindow | null {
 
 let layerMode: PetLayerMode = 'bottom'
 
+/** 失焦沉底的延迟器：给正在进行的 WM_ACTIVATE 交接留出完成时间 */
+let sinkTimer: NodeJS.Timeout | null = null
+
+function cancelSink(): void {
+  if (sinkTimer) {
+    clearTimeout(sinkTimer)
+    sinkTimer = null
+  }
+}
+
 function pinIfBottom(): void {
   const win = petWindow
   // 焦点豁免：从岛卡片唤回平板时窗口正持有焦点，此时沉底会把刚唤回的平板
@@ -39,6 +49,23 @@ export function applyPetLayer(): void {
   }
   win.setAlwaysOnTop(false)
   sendWindowToBottom(win)
+}
+
+/** 渲染层前台自愈：页面失焦却收到点击时，主进程补一次激活 */
+export function focusPetWindow(): void {
+  const win = petWindow
+  if (!win || win.isDestroyed()) return
+  if (!win.isFocused()) {
+    win.focus()
+    return
+  }
+  // OS 认为已在前台、页面却还失焦（激活状态脱节）：走一圈 blur/focus 逼出
+  // 新的 WM_SETFOCUS，Chromium 才能对齐自己的焦点状态。blur 会武装沉底计时，
+  // 但 50ms 后 focus 复位，pinIfBottom 的 isFocused 守卫保证不会真的沉下去。
+  win.blur()
+  setTimeout(() => {
+    if (win && !win.isDestroyed()) win.focus()
+  }, 50)
 }
 
 /** 记住窗口位置：拖动停稳后落盘，下次启动恢复（中心点不在任何屏幕内则回默认位） */
@@ -108,7 +135,15 @@ export function createPetWindow(): BrowserWindow {
   // 沉底模式下：显示/恢复时重新沉底；点平板会浮到普通窗口之上，失焦后立刻沉回去
   petWindow.on('show', pinIfBottom)
   petWindow.on('restore', pinIfBottom)
-  petWindow.on('blur', pinIfBottom)
+  // 失焦沉底延迟 120ms：blur 常落在两次激活的交接路上（点别的窗口的那一瞬），
+  // 此刻立刻 SetWindowPos(HWND_BOTTOM) 会掐断还没走完的激活，窗口落进
+  // "看得见但页面没激活"的死状态——点输入框没光标、打字全进别的窗口，截屏
+  // 切一次前台才救得活。晚一拍沉底肉眼无感；期间拿回焦点有 isFocused 守卫拦着。
+  petWindow.on('blur', () => {
+    cancelSink()
+    sinkTimer = setTimeout(pinIfBottom, 120)
+  })
+  petWindow.on('focus', cancelSink)
   petWindow.once('ready-to-show', () => petWindow?.show())
   // 最大化时整体等比缩放：UI 是固定 628×484 的绝对布局，靠缩放适配大窗
   const fitZoom = (): void => {
@@ -231,7 +266,7 @@ export function popupPetMenu(): void {
       click: () => (hideToIslandHandler ? hideToIslandHandler() : win.hide())
     },
     { type: 'separator' },
-    { label: '退出桌宠', click: () => app.quit() }
+    { label: '退出叶瞬光', click: () => app.quit() }
   ])
   menu.popup({ window: win })
 }

@@ -146,7 +146,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   tts: {
     enabled: true,
-    provider: 'bailian',
+    provider: 'gptsovits',
     apiKey: '',
     model: 'qwen-audio-3.1-tts-flash',
     voice: '',

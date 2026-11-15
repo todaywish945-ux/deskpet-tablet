@@ -15,6 +15,8 @@ declare global {
       startDrag: (offsetX: number, offsetY: number) => void
       endDrag: () => void
       contextMenu: () => void
+      /** 前台自愈：请求主进程补一次窗口激活 */
+      focusWindow: () => void
       /** 平板渲染层：闲置收起请求守卫通过后确认执行 */
       applyTabletHide: () => Promise<void>
       /** 灵动岛：展开卡片（主进程放大窗口后回 pet:island-mode） */

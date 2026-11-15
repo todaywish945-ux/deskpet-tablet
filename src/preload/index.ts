@@ -27,7 +27,7 @@ const PET_EVENTS = [
 ] as const
 
 contextBridge.exposeInMainWorld('petAPI', {
-  /** 发送一条消息给桌宠 */
+  /** 发送一条消息给叶瞬光 */
   send: (text: string) => ipcRenderer.invoke('pet:send', text),
   /** 停止当前语音播报 */
   stop: () => ipcRenderer.invoke('pet:stop'),
@@ -41,6 +41,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   startDrag: (offsetX: number, offsetY: number) => ipcRenderer.send('win:start-drag', offsetX, offsetY),
   endDrag: () => ipcRenderer.send('win:end-drag'),
   contextMenu: () => ipcRenderer.send('win:context-menu'),
+  /** 前台自愈：页面失焦却收到点击时，让主进程补一次窗口激活 */
+  focusWindow: () => ipcRenderer.send('win:focus-request'),
   /** 平板渲染层：闲置收起请求，守卫通过后确认执行 */
   applyTabletHide: () => ipcRenderer.invoke('tablet:hide-apply'),
   /** 灵动岛：请求展开卡片（主进程放大窗口后回 pet:island-mode=card） */

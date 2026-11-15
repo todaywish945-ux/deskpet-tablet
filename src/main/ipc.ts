@@ -1,6 +1,6 @@
 import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
 import { AppConfig } from '../shared/types'
-import { getPetWindow, startDrag, stopDrag, popupPetMenu, applyPetLayer, setIslandToggleHandler, setHideToIslandHandler, setCollapseToIslandHandler, PET_WIDTH, PET_HEIGHT } from './petWindow'
+import { getPetWindow, startDrag, stopDrag, popupPetMenu, applyPetLayer, focusPetWindow, setIslandToggleHandler, setHideToIslandHandler, setCollapseToIslandHandler, PET_WIDTH, PET_HEIGHT } from './petWindow'
 import {
   initIsland,
   setIslandBusyGuard,
@@ -122,7 +122,7 @@ export function registerIpc(): void {
     // 灵动岛开启：最小化 = 直接收成灵动岛（不进任务栏）；关闭时保持原任务栏最小化
     if (loadConfig().window.island) hideTabletShowIsland()
     else getPetWindow()?.minimize()
-   })
+  })
 
     ipcMain.handle('win:maximize-toggle', () => {
     const win = getPetWindow()
@@ -169,6 +169,8 @@ export function registerIpc(): void {
   })
   ipcMain.on('win:end-drag', () => stopDrag())
   ipcMain.on('win:context-menu', () => popupPetMenu())
+  // 前台自愈：页面失焦却收到点击时补一次激活（see petWindow.focusPetWindow）
+  ipcMain.on('win:focus-request', () => focusPetWindow())
   // 渲染层视图变化上报（主界面/通话）：控制桥的通话端点据此判断通话是否进行中
   ipcMain.on('win:view-changed', (_event, view: string) => {
     setCallActive(view === 'call')

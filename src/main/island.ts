@@ -10,6 +10,7 @@
 import { BrowserWindow } from 'electron'
 import { loadConfig, saveConfig } from './services/store'
 import { getPetWindow } from './petWindow'
+import { raiseWindowAboveNormal } from './win32'
 import { showCapsule, hideIsland, isIslandVisible } from './islandWindow'
 
 /** 她忙不忙（说话/思考/摸头反应中）由 ipc.ts 注入，避免与 chatPipeline 循环依赖 */
@@ -100,13 +101,24 @@ export function collapseToIslandNow(): void {
  * 唤回平板：岛收起、平板出现并拿焦点。
  * 沉底模式靠"聚焦期间不沉"（pinIfBottom 的焦点豁免）保证唤回后可见，失焦自然沉回。
  */
-export function showTablet(focusChat = false): void {
+export function showTablet(focusChat = false, quiet = false): void {
   clearTimers()
   hideIsland()
   const win = getPetWindow()
   if (!win || win.isDestroyed()) return
-  if (!win.isVisible()) win.show()
-  win.focus()
+  if (!win.isVisible()) {
+    if (quiet) win.showInactive() // 主动关心唤回：看得见但不抢正在用的窗口焦点
+    else win.show()
+  }
+  if (!quiet) win.focus()
+  // 激活复核：全屏游戏这类前台窗口会让 show/focus 的激活悄悄落空——平板停在
+  // Z 序底（被盖住看不见）或页面没激活（点了没反应）。180ms 后还没拿到焦点
+  // 就硬抬到普通窗口之上再补一次聚焦；quiet 只抬不抢焦点。
+  setTimeout(() => {
+    if (!win || win.isDestroyed() || !win.isVisible() || win.isFocused()) return
+    raiseWindowAboveNormal(win)
+    if (!quiet) win.focus()
+  }, 180)
   if (focusChat) win.webContents.send('pet:island-focus-chat')
   win.webContents.send('pet:tablet-shown')
 }
