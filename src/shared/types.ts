@@ -142,7 +142,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   llm: {
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     apiKey: '',
-    model: 'glm-5.3-flash'
+    model: 'glm-4.5-flash'
   },
   tts: {
     enabled: true,
