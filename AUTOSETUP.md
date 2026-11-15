@@ -39,7 +39,7 @@ GPT-SoVITS 整合包目录：<仅 gptsovits 时填；纯英文路径，整合包
 > 源码版总指令（想魔改或源码运行）在下方。
 
 ```text
-你是我的电脑配置助手。目标：安装并配置「平板桌宠」——一块摆在桌面上的平板，AI 角色「住」在里面，会聊天、有情绪表情、用克隆的声音说话。
+你是我的电脑配置助手。目标：安装并配置「叶瞬光桌宠」——一块摆在桌面上的平板，AI 角色「住」在里面，会聊天、有情绪表情、用克隆的声音说话。
 严格按阶段执行：每阶段完成 → 对照验收标准自检 → 更新进度文件 → 一句话向我简报 → 进入下一阶段。
 
 【我的信息】
@@ -49,27 +49,27 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 整合包目录：<仅 B 需要；GPT-SoVITS 整合包解压后的目录，纯英文路径>
 
 【进度管理（最先做）】
-进度文件 %APPDATA%\deskpet-tablet\配置进度.json，格式 {"stage":"","status":"done|failed","evidence":""}。
+进度文件 %APPDATA%\叶瞬光桌宠\配置进度.json，格式 {"stage":"","status":"done|failed","evidence":""}。
 已存在则跳过 status=done 的阶段从断点继续，绝不重做。每完成/失败一个阶段立即更新它。
 
 【阶段 1 · 下载并安装】
 1. 下载安装包（约 312MB）到下载文件夹：
-   主链接 https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.1/deskpet-tablet-setup-0.1.0.exe
+   主链接 https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.1/yeshunguang-deskpet-setup-0.1.0.exe（叶瞬光完整版，362MB；安装后应用名「叶瞬光桌宠」）
    下载失败或太慢就换镜像：在完整链接前面加 https://gh-proxy.com/ 前缀再下。
 2. 静默安装：运行安装包并加参数 /S；或启动向导让我点完。
-3. 从桌面/开始菜单的「平板桌宠」快捷方式启动。
+3. 从桌面/开始菜单的「叶瞬光桌宠」快捷方式启动。
 验收：安装目录存在主程序 exe，进程在运行。
 连续失败 2 次（含换镜像重试）→ 停下把输出贴给我。
 
 【阶段 2 · 写入 API Key（需要先退出应用）】
 1. 退出平板桌宠（托盘图标右键 → 退出桌宠；或结束对应进程）。
-2. 打开/创建 %APPDATA%\deskpet-tablet\data\config.json：
+2. 打开/创建 %APPDATA%\叶瞬光桌宠\data\config.json：
    - 我的智谱 Key 填进 llm.apiKey
    - 我的百炼 Key（如果给了）填进 tts.apiKey
    其他任何字段不许动。注意：应用首次运行**不会**生成 config.json（只在保存设置时写入）——
    文件不存在就直接创建 data 目录和 config.json 并写入完整 JSON。
 3. 重新启动平板桌宠。
-验收：访问 http://127.0.0.1:37820/health 返回 JSON 且 "app":"deskpet-tablet"。
+验收：访问 http://127.0.0.1:37820/health 返回 JSON 且 "app":"ye-shunguang-deskpet"。
 
 【阶段 3 · 配音方式：先检测条件，再让我选择】
 三种方式：A 在线克隆（百炼，按量计费，无需显卡）/ B 本地 GPT-SoVITS（完全免费，需英伟达 N 卡）
@@ -89,7 +89,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
      - 我想用 A 但没有百炼 Key：带我开通——浏览器打开 bailian.console.aliyun.com，
        引导我开通服务并创建 API Key，我贴给你后写入 tts.apiKey，再走上一条。
    ▶ B 本地 GPT-SoVITS：
-     - N卡 ✓ + 整合包 ✓：退出平板桌宠 → 修改 %APPDATA%\deskpet-tablet\data\config.json
+     - N卡 ✓ + 整合包 ✓：退出平板桌宠 → 修改 %APPDATA%\叶瞬光桌宠\data\config.json
        的 tts 段：
        "provider": "gptsovits",
        "gsvApiBase": "http://127.0.0.1:9880",
@@ -111,7 +111,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
    ▶ C：跳过语音配置，说明纯文字聊天已可用、以后随时能补。
 验收：A → 注册成功提示出现，或我确认听到了试听；
       B → 她说第一句话时框架会自动拉起本地服务（首次等 1~2 分钟属正常），有声即过，
-          失败读 %APPDATA%\deskpet-tablet\logs\gsv-autostart.log 最后 30 行贴给我；
+          失败读 %APPDATA%\叶瞬光桌宠\logs\gsv-autostart.log 最后 30 行贴给我；
       C → 本阶段直接通过。
 
 【阶段 4 · 最终验收与报告】
