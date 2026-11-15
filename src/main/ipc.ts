@@ -119,8 +119,10 @@ export function registerIpc(): void {
 
   // ---------- 窗口控制（右上角三键） ----------
   ipcMain.handle('win:minimize', () => {
-    getPetWindow()?.minimize()
-  })
+    // 灵动岛开启：最小化 = 直接收成灵动岛（不进任务栏）；关闭时保持原任务栏最小化
+    if (loadConfig().window.island) hideTabletShowIsland()
+    else getPetWindow()?.minimize()
+   })
 
     ipcMain.handle('win:maximize-toggle', () => {
     const win = getPetWindow()
