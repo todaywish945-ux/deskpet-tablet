@@ -44,30 +44,41 @@ export async function streamChat(options: ChatStreamOptions): Promise<string> {
 
   try {
     arm(CONNECT_TIMEOUT_MS)
-    const response = await fetch(`${base}/chat/completions`, {
-      method: 'POST',
-      signal: watchdog.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiKey}`
-      },
-      body: JSON.stringify({
-        model: config.model,
-        stream: true,
-        temperature: temperature ?? 0.8,
-        messages: [
-          { role: 'system', content: system },
-          // 历史里的助手消息要把情绪标签拼回去：让模型看到一致的输出格式，才会持续遵守协议
-          ...history.slice(-24).map((m) => ({
-            role: m.role,
-            content:
-              m.role === 'assistant' && m.emotion && m.emotion !== 'neutral'
-                ? `[emotion:${m.emotion}]\n${m.content}`
-                : m.content
-          }))
-        ]
-      })
+    const payload = JSON.stringify({
+      model: config.model,
+      stream: true,
+      temperature: temperature ?? 0.8,
+      messages: [
+        { role: 'system', content: system },
+        // 历史里的助手消息要把情绪标签拼回去：让模型看到一致的输出格式，才会持续遵守协议
+        ...history.slice(-24).map((m) => ({
+          role: m.role,
+          content:
+            m.role === 'assistant' && m.emotion && m.emotion !== 'neutral'
+              ? `[emotion:${m.emotion}]\n${m.content}`
+              : m.content
+        }))
+      ]
     })
+    const request = (): Promise<Response> =>
+      fetch(`${base}/chat/completions`, {
+        method: 'POST',
+        signal: watchdog.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${config.apiKey}`
+        },
+        body: payload
+      })
+
+    // 429（限流/排队，如免费模型高峰 1305）静默重试：退避后原样重发，用户无感；
+    // 其余状态码（401/1113 余额类等）重试无意义，直接抛给上层提示
+    let response = await request()
+    for (let attempt = 0; response.status === 429 && attempt < 2; attempt++) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 8000))
+      arm(CONNECT_TIMEOUT_MS)
+      response = await request()
+    }
 
     if (!response.ok || !response.body) {
       const detail = await response.text().catch(() => '')
