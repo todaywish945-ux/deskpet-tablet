@@ -53,7 +53,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 已存在则跳过 status=done 的阶段从断点继续，绝不重做。每完成/失败一个阶段立即更新它。
 
 【阶段 1 · 下载并安装】
-1. 下载安装包（约 312MB）到下载文件夹：
+1. 下载安装包（约 362MB）到下载文件夹：
    主链接 https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.1/yeshunguang-deskpet-setup-0.1.0.exe（叶瞬光完整版，362MB；安装后应用名「叶瞬光桌宠」）
    下载失败或太慢就换镜像：在完整链接前面加 https://gh-proxy.com/ 前缀再下。
 2. 静默安装：运行安装包并加参数 /S；或启动向导让我点完。
