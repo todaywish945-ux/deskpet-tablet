@@ -1,95 +1,146 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { app, BrowserWindow, protocol, session } from 'electron'
+import { join, normalize, sep } from 'path'
+import { readFileSync, existsSync, statSync } from 'fs'
+import { registerIpc } from './ipc'
+import { createPetWindow } from './petWindow'
+import { initIsland, showTablet } from './island'
+import { createIslandWindow } from './islandWindow'
+import { createTray } from './tray'
+import { createSettingsWindow } from './settingsWindow'
+import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
+import { assetRoot, activeSkinDir, loadConfig } from './services/store'
+import { warmUpGsv } from './services/gsv'
 
-const PET_EVENTS = [
-  'pet:state',
-  'pet:user-message',
-  'pet:message',
-  'pet:emotion',
-  'pet:interrupt',
-  'pet:llm-delta',
-  'pet:llm-done',
-  'pet:sentence',
-  'pet:tts-preload',
-  'pet:tts-start',
-  'pet:tts-chunk',
-  'pet:tts-end',
-  'pet:tts-error',
-  'pet:error',
-  'pet:config-changed',
-  'pet:bridge-audio-sink',
-  'pet:island-mode',
-  'pet:island-dock',
-  'pet:tablet-hide-request',
-  'pet:tablet-shown',
-  'pet:island-focus-chat',
-  'pet:call-start',
-  'pet:call-end'
-] as const
-
-contextBridge.exposeInMainWorld('petAPI', {
-  /** 发送一条消息给叶瞬光 */
-  send: (text: string) => ipcRenderer.invoke('pet:send', text),
-  /** 停止当前语音播报 */
-  stop: () => ipcRenderer.invoke('pet:stop'),
-  openSettings: () => ipcRenderer.invoke('app:open-settings'),
-  winMinimize: () => ipcRenderer.invoke('win:minimize'),
-  winMaximizeToggle: () => ipcRenderer.invoke('win:maximize-toggle'),
-  winClose: () => ipcRenderer.invoke('win:close'),
-  /** 可选角色皮肤列表（设置页下拉） */
-  listSkins: () => ipcRenderer.invoke('skins:list'),
-  hidePet: () => ipcRenderer.invoke('app:hide-pet'),
-  startDrag: (offsetX: number, offsetY: number) => ipcRenderer.send('win:start-drag', offsetX, offsetY),
-  endDrag: () => ipcRenderer.send('win:end-drag'),
-  contextMenu: () => ipcRenderer.send('win:context-menu'),
-  /** 前台自愈：页面失焦却收到点击时，让主进程补一次窗口激活 */
-  focusWindow: () => ipcRenderer.send('win:focus-request'),
-  /** 平板渲染层：闲置收起请求，守卫通过后确认执行 */
-  applyTabletHide: () => ipcRenderer.invoke('tablet:hide-apply'),
-  /** 灵动岛：请求展开卡片（主进程放大窗口后回 pet:island-mode=card） */
-  expandCard: () => ipcRenderer.send('island:expand-card'),
-  /** 灵动岛：卡片收起动画播完，请主进程缩回胶囊 */
-  collapseApply: () => ipcRenderer.invoke('island:collapse-card-apply'),
-  /** 灵动岛：拖动胶囊（主进程 16ms 轮询光标） */
-  startIslandDrag: (offsetX: number, offsetY: number) =>
-    ipcRenderer.send('island:start-drag', offsetX, offsetY),
-  endIslandDrag: () => ipcRenderer.send('island:end-drag'),
-  /** 停靠细条：鼠标靠近/点击 → 滑出胶囊 */
-  peekIsland: () => ipcRenderer.send('island:peek'),
-  /** 滑出后鼠标离开 → 800ms 后收回细条 */
-  retreatIsland: () => ipcRenderer.send('island:retreat'),
-  /** 岛卡片按钮：唤回平板（focusChat=顺带聚焦输入框） */
-  showTablet: (focusChat = false) => ipcRenderer.invoke('app:show-tablet', focusChat),
-  /** 双击平板反应：head=摸头 body=点屏幕 */
-  pat: (zone: 'head' | 'body') => ipcRenderer.invoke('pet:pat', zone),
-  /** 视图变化上报（主界面/通话）：控制桥据此判断通话是否进行中 */
-  notifyView: (view: 'home' | 'call') => ipcRenderer.send('win:view-changed', view),
-  /** 全部会话（含消息） */
-  listSessions: () => ipcRenderer.invoke('sessions:list'),
-  /** 新建会话并设为当前，返回会话对象 */
-  createSession: (topic: string) => ipcRenderer.invoke('sessions:create', topic),
-  /** 打开历史会话并设为当前 */
-  openSession: (id: string) => ipcRenderer.invoke('sessions:open', id),
-  deleteSession: (id: string) => ipcRenderer.invoke('sessions:delete', id),
-  deleteSessions: (ids: string[]) => ipcRenderer.invoke('sessions:delete-many', ids),
-  /** 接通视频：由她围绕会话主题先开口 */
-  beginCall: () => ipcRenderer.invoke('call:begin'),
-  /** 档案记忆：她长期记住的关于用户的事实 */
-  getProfile: () => ipcRenderer.invoke('profile:get'),
-  deleteProfileFact: (factId: string) => ipcRenderer.invoke('profile:delete-fact', factId),
-  on: (channel: (typeof PET_EVENTS)[number], callback: (...args: unknown[]) => void) => {
-    if (!(PET_EVENTS as readonly string[]).includes(channel)) return
-    const listener = (_event: unknown, ...args: unknown[]): void => callback(...args)
-    ipcRenderer.on(channel, listener)
+// 自定义资源协议：渲染层通过 petasset://assets/... 访问 assets 目录（视频/图片/清单）
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'petasset',
+    privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true }
   }
-})
+])
 
-contextBridge.exposeInMainWorld('settingsAPI', {
-  getConfig: () => ipcRenderer.invoke('config:get'),
-  saveConfig: (config: unknown) => ipcRenderer.invoke('config:save', config),
-  enrollVoice: () => ipcRenderer.invoke('voice:enroll'),
-  testVoice: (text: string) => ipcRenderer.invoke('voice:test', text),
-  pickRefAudio: () => ipcRenderer.invoke('voice:pick-ref-audio'),
-  probeGsv: (apiBase: string) => ipcRenderer.invoke('voice:probe-gsv', apiBase),
-  openPet: () => ipcRenderer.invoke('app:toggle-pet'),
-  quit: () => ipcRenderer.invoke('app:quit')
-})
+const MIME: Record<string, string> = {
+  '.png': 'image/png',
+  '.webp': 'image/webp',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webm': 'video/webm',
+  '.mp4': 'video/mp4',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.json': 'application/json',
+  '.md': 'text/plain; charset=utf-8',
+  '.js': 'text/javascript',
+  '.moc3': 'application/octet-stream',
+  '.model3.json': 'application/json',
+  '.motion3.json': 'application/json',
+  '.exp3.json': 'application/json',
+  '.cdi3.json': 'application/json'
+}
+
+function serveAsset(url: string, request: Request): Response {
+  // ⚠ standard scheme 会把第一段当主机名：petasset://skin/x → host='skin'、pathname='/x'。
+  //   按 host 路由（旧代码按 pathname 判断恰好因 host='assets' 被丢弃而等效）
+  const parsed = new URL(url)
+  let root: string
+  if (parsed.host === 'skin') {
+    root = activeSkinDir()
+  } else {
+    root = assetRoot()
+  }
+  const rel = decodeURIComponent(parsed.pathname).replace(/^\/+/, '')
+  const full = normalize(join(root, rel))
+  if (!full.startsWith(root + sep) && full !== root) {
+    return new Response('forbidden', { status: 403 })
+  }
+  if (!existsSync(full) || !statSync(full).isFile()) {
+    return new Response('not found', { status: 404 })
+  }
+  const type = MIME[join(full).split('.').pop()!.toLowerCase()] ?? 'application/octet-stream'
+  const data = new Uint8Array(readFileSync(full))
+  const range = request.headers.get('range')
+  if (range) {
+    const match = /bytes=(\d*)-(\d*)/.exec(range)
+    if (match) {
+      const start = match[1] ? parseInt(match[1], 10) : 0
+      const end = match[2] ? parseInt(match[2], 10) : data.length - 1
+      const slice = data.subarray(start, end + 1)
+      return new Response(slice, {
+        status: 206,
+        headers: {
+          'Content-Type': type,
+          'Content-Range': `bytes ${start}-${end}/${data.length}`,
+          'Content-Length': String(slice.length),
+          'Accept-Ranges': 'bytes',
+          'Access-Control-Allow-Origin': '*'
+        }
+      })
+    }
+  }
+  return new Response(data, {
+    headers: {
+      'Content-Type': type,
+      'Content-Length': String(data.length),
+      'Accept-Ranges': 'bytes',
+      // 素材/清单热更新后 Chromium 的启发式缓存会返回旧数据
+      'Cache-Control': 'no-cache',
+      // PIXI/Live2D 从页面 origin 跨 scheme fetch 模型文件需要 CORS
+      'Access-Control-Allow-Origin': '*'
+    }
+  })
+}
+
+const gotLock = app.requestSingleInstanceLock()
+if (!gotLock) {
+  app.quit()
+} else {
+  // 语音播报不依赖用户手势触发 AudioContext
+  app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+  // PET_REMOTE_DEBUG=1 时开 CDP 调试端口（渲染层调试取证用）；端口可用
+  // PET_REMOTE_DEBUG_PORT 覆盖（默认 9222 被幽灵句柄占着时换个口即可）
+  if (process.env['PET_REMOTE_DEBUG'] === '1') {
+    app.commandLine.appendSwitch('remote-debugging-port', process.env['PET_REMOTE_DEBUG_PORT'] || '9222')
+  }
+
+  app.on('second-instance', () => {
+    showTablet(false) // 再次启动 = 想找她：岛态直接唤回平板
+    const win = BrowserWindow.getAllWindows()[0]
+    if (win) {
+      if (win.isMinimized()) win.restore()
+      win.focus()
+    }
+  })
+
+  void app.whenReady().then(() => {
+    // 语音输入要用麦克风：只放行媒体权限，其余维持默认拒绝
+    session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+      callback(permission === 'media')
+    })
+
+    protocol.handle('petasset', (request) => serveAsset(request.url, request))
+
+    registerIpc()
+    startPluginBridge() // 桥先起：打包版桌宠窗口要从桥加载页面（见 petWindow.ts）
+    createPetWindow()
+    void warmUpGsv(loadConfig().tts) // 预热本地语音：模型先装显存，用户第一句话不再冷启动
+    initIsland() // 灵动岛闲置计时挂在桌宠窗口的 blur/focus 上（窗口已建好）
+    createIslandWindow() // 独立岛窗口：闲置收起平板后亮出胶囊
+    createTray()
+    if (process.env['PET_OPEN_SETTINGS'] === '1') {
+      createSettingsWindow()
+    }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) createPetWindow()
+    })
+  })
+
+  // 桌宠常驻：关掉窗口不退出，走托盘退出
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      // 保持托盘常驻，不退出
+    }
+  })
+
+  app.on('will-quit', () => stopPluginBridge())
+}
