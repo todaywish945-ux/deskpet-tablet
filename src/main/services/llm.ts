@@ -55,6 +55,10 @@ export async function streamChat(options: ChatStreamOptions): Promise<string> {
       model: config.model,
       stream: true,
       temperature: temperature ?? 0.8,
+      // GLM 4.5+ 系默认开"深度思考"：首字前先吐几百字思考链，闲聊场景纯属拖慢（实测首字 30~55s），
+      // 关掉后 0.5~2s 且情绪标签协议照常遵守；glm-4-flash（无思考代际）实测也容忍此参数。
+      // 只对 glm 模型发送，避免用户把 baseUrl 指向别家 OpenAI 兼容端点时收到未知参数报 400
+      ...(config.model.toLowerCase().startsWith('glm') ? { thinking: { type: 'disabled' } } : {}),
       messages: [
         { role: 'system', content: system },
         // 历史里的助手消息要把情绪标签拼回去：让模型看到一致的输出格式，才会持续遵守协议
