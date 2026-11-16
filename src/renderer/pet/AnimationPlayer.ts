@@ -438,41 +438,58 @@ export class AnimationPlayer {
   private lastTime = 0
   private stuckTicks = 0
 
-  /** 自愈：元素在播放状态但时钟停走（隐藏窗口启动被 Chromium 冻结的管道）时强制重载 */
+  /** 自愈：可见层异常钉死超过 ~1.5s 时整层重建。两种形态：
+   *  ① 元素在播放但时钟停走（数据未稳流时的 seek 让管道进入永不完成的 seek）；
+   *  ② 元素已播完/暂停停在尾帧（换层时 play() 挂起不换屏）——原来自愈盲区，
+   *     只在待机态兜底（开口前的过渡尾帧待命、收势链入是正常停留，不能动） */
   private checkStuck(): void {
     const cur = this.layers[this.activeLayer]
-    if (!cur.src || cur.paused) {
+    if (!cur.src) {
       this.stuckTicks = 0
       return
     }
-    if (Math.abs(cur.currentTime - this.lastTime) > 0.001) {
+    if (cur.paused || cur.ended) {
+      const holdingTail =
+        this.state === 'idle' && !this.emotion && !this.settling && !this.pendingSettle && !this.enteringTalk
+      if (!holdingTail) {
+        this.stuckTicks = 0
+        return
+      }
+    } else if (Math.abs(cur.currentTime - this.lastTime) > 0.001) {
       this.lastTime = cur.currentTime
       this.stuckTicks = 0
       return
     }
     this.stuckTicks++
-    if (this.stuckTicks > 90) {
-      this.stuckTicks = 0
-      this.settleIdx = 0
-      // 冻结的元素无法恢复，整层重建
-      const old = this.layers
-      this.layers = []
-      this.activeLayer = 0
-      this.fadeToken++
-      this.loopingClip = false
-      for (const v of old) {
-        try {
-          v.pause()
-        } catch {
-          /* 忽略 */
-        }
-        v.removeAttribute('src')
-        v.load()
-        v.remove()
+    if (this.stuckTicks > 90) this.rebuildLayers()
+  }
+
+  /** 冻结/钉死的元素无法恢复，整层重建并强制回待机 */
+  private rebuildLayers(): void {
+    this.stuckTicks = 0
+    this.settleIdx = 0
+    this.exiting = false
+    this.enteringTalk = null
+    this.pendingSettle = null
+    this.settling = null
+    this.cancelFinishTimer()
+    const old = this.layers
+    this.layers = []
+    this.activeLayer = 0
+    this.fadeToken++
+    this.loopingClip = false
+    for (const v of old) {
+      try {
+        v.pause()
+      } catch {
+        /* 忽略 */
       }
-      this.setupVideoLayers()
-      this.render(true)
+      v.removeAttribute('src')
+      v.load()
+      v.remove()
     }
+    this.setupVideoLayers()
+    this.render(true)
   }
 
   /** 首尾最佳匹配帧循环（loop-points.json）：到达 loopOut 直接跳回 loopIn，两帧几乎相同、肉眼无缝。
