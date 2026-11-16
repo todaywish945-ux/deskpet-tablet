@@ -33,17 +33,24 @@ export async function streamChat(options: ChatStreamOptions): Promise<string> {
   const { config, system, history, signal, temperature, onDelta } = options
   const base = config.baseUrl.replace(/\/+$/, '')
 
-  const watchdog = new AbortController()
+  // 看门狗按"尝试"重建：AbortController 一旦 abort 就永久作废，重试必须换新的
+  let watchdog = new AbortController()
+  let watchdogTimer: ReturnType<typeof setTimeout> | null = null
   const abortFromTurn = (): void => watchdog.abort()
   signal?.addEventListener('abort', abortFromTurn, { once: true })
-  let watchdogTimer: ReturnType<typeof setTimeout> | null = null
   const arm = (ms: number): void => {
     if (watchdogTimer) clearTimeout(watchdogTimer)
     watchdogTimer = setTimeout(() => watchdog.abort(), ms)
   }
 
+  /** 本轮是否已经吐出过正文：出过字的停滞无法安全整轮重发（正文会重复），只有没出过字才能重试 */
+  let gotContent = false
+  const onDeltaTracked = (text: string): void => {
+    gotContent = true
+    onDelta(text)
+  }
+
   try {
-    arm(CONNECT_TIMEOUT_MS)
     const payload = JSON.stringify({
       model: config.model,
       stream: true,
@@ -71,55 +78,80 @@ export async function streamChat(options: ChatStreamOptions): Promise<string> {
         body: payload
       })
 
-    // 429（限流/排队，如免费模型高峰 1305）静默重试：退避后原样重发，用户无感；
-    // 其余状态码（401/1113 余额类等）重试无意义，直接抛给上层提示
-    let response = await request()
-    for (let attempt = 0; response.status === 429 && attempt < 2; attempt++) {
-      await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 8000))
-      arm(CONNECT_TIMEOUT_MS)
-      response = await request()
-    }
-
-    if (!response.ok || !response.body) {
-      const detail = await response.text().catch(() => '')
-      throw new Error(`大模型接口返回 ${response.status}：${detail.slice(0, 200)}`)
-    }
-
     let full = ''
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-    let buffer = ''
+    const attemptStream = async (): Promise<string> => {
+      arm(CONNECT_TIMEOUT_MS)
+      // 429（限流/排队，如免费模型高峰 1305）静默重试：退避后原样重发，用户无感；
+      // 其余状态码（401/1113 余额类等）重试无意义，直接抛给上层提示
+      let response = await request()
+      for (let attempt = 0; response.status === 429 && attempt < 2; attempt++) {
+        await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 8000))
+        arm(CONNECT_TIMEOUT_MS)
+        response = await request()
+      }
 
-    arm(STREAM_IDLE_TIMEOUT_MS)
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
+      if (!response.ok || !response.body) {
+        const detail = await response.text().catch(() => '')
+        throw new Error(`大模型接口返回 ${response.status}：${detail.slice(0, 200)}`)
+      }
+
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+
       arm(STREAM_IDLE_TIMEOUT_MS)
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed.startsWith('data:')) continue
-        const payload = trimmed.slice(5).trim()
-        if (payload === '[DONE]') continue
-        try {
-          const event = JSON.parse(payload)
-          const delta: string | undefined = event.choices?.[0]?.delta?.content
-          if (delta) {
-            full += delta
-            onDelta(delta)
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        arm(STREAM_IDLE_TIMEOUT_MS)
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        for (const line of lines) {
+          const trimmed = line.trim()
+          if (!trimmed.startsWith('data:')) continue
+          const payload = trimmed.slice(5).trim()
+          if (payload === '[DONE]') continue
+          try {
+            const event = JSON.parse(payload)
+            const delta: string | undefined = event.choices?.[0]?.delta?.content
+            if (delta) {
+              full += delta
+              onDeltaTracked(delta)
+            }
+          } catch {
+            // 忽略无法解析的行（心跳、注释等）
           }
-        } catch {
-          // 忽略无法解析的行（心跳、注释等）
         }
+      }
+      return full
+    }
+
+    // 连接阶段（一个字都没收到）被看门狗掐断也是免费模型高峰的排队形态——服务器既不回
+    // 状态码也不断开（实测极小请求可挂 40s+），和 429 同性质：退避后整轮重发，用户无感
+    for (let attempt = 0; ; attempt++) {
+      try {
+        await attemptStream()
+        break
+      } catch (error) {
+        const hungBeforeContent =
+          (error as Error).name === 'AbortError' && !signal?.aborted && !gotContent
+        if (hungBeforeContent && attempt < 2) {
+          await new Promise((r) => setTimeout(r, attempt === 0 ? 3000 : 8000))
+          continue
+        }
+        throw error
       }
     }
     return full
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
       if (signal?.aborted) throw new Error('已取消')
-      throw new Error('回复流停滞了（60 秒没有任何新内容），这轮先说到这。')
+      throw new Error(
+        gotContent
+          ? '回复流停滞了（60 秒没有任何新内容），这轮先说到这。'
+          : '连接一直没通（服务器没响应），稍后再试一次吧。'
+      )
     }
     throw error
   } finally {
