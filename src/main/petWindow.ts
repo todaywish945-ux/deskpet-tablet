@@ -8,9 +8,13 @@ import { pluginPort } from './services/pluginBridge'
 import { petLogWS } from './services/pluginBridge'
 import type { PetLayerMode } from '../shared/types'
 
-/** 平板外框尺寸（含边框）；屏幕区 4:3 横向，与动画素材 (2880x2160) 比例一致 */
-export const PET_WIDTH = 628
-export const PET_HEIGHT = 484
+/** 平板外框尺寸（含边框）；屏幕区 4:3 横向，与动画素材 (2880x2160) 比例一致。
+ *  2026-11-16 720×560：敲敲 UI 上线后用户反馈小字糊，整体放大 14.6% */
+export const PET_WIDTH = 720
+export const PET_HEIGHT = 560
+/** 渲染层 CSS 布局基准（style.css html/body 尺寸不变），常态整体放大到外框尺寸 */
+const CSS_WIDTH = 628
+const CSS_HEIGHT = 484
 
 let petWindow: BrowserWindow | null = null
 
@@ -145,14 +149,21 @@ export function createPetWindow(): BrowserWindow {
   })
   petWindow.on('focus', cancelSink)
   petWindow.once('ready-to-show', () => petWindow?.show())
-  // 最大化时整体等比缩放：UI 是固定 628×484 的绝对布局，靠缩放适配大窗
+  // 最大化时整体等比缩放：UI 是固定 CSS 基准（628×484）的绝对布局，靠缩放适配大窗
   const fitZoom = (): void => {
     if (!petWindow || petWindow.isDestroyed()) return
     const [w, h] = petWindow.getSize()
-    petWindow.webContents.setZoomFactor(Math.min(w / PET_WIDTH, h / PET_HEIGHT))
+    petWindow.webContents.setZoomFactor(Math.min(w / CSS_WIDTH, h / CSS_HEIGHT))
   }
   petWindow.on('resize', fitZoom)
-  petWindow.webContents.setZoomFactor(1) // 清掉 Electron 按域名持久化的缩放，启动永远回到标准尺寸
+  // 清掉 Electron 按域名持久化的缩放，启动固定为「外框尺寸 / CSS 基准」：
+  // 整个 UI 等比放大到 720×560（鸿蒙体小字才不糊），最大化时 fitZoom 再按窗口算
+  petWindow.webContents.setZoomFactor(PET_WIDTH / CSS_WIDTH)
+  // ⚠ Electron 在页面导航完成后会按 origin 重置缩放（持久化行为），必须在
+  //   did-finish-load 再钉一次，否则常态放大会被悄悄改回 1（实测 innerWidth 变 721 暴露）
+  petWindow.webContents.on('did-finish-load', () => {
+    if (petWindow && !petWindow.isDestroyed()) petWindow.webContents.setZoomFactor(PET_WIDTH / CSS_WIDTH)
+  })
 
   if (process.env['ELECTRON_RENDERER_URL']) {
     petWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/pet/index.html`)

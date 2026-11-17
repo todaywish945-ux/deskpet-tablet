@@ -116,12 +116,17 @@ export function extractEmotion(text: string): { display: string; emotion: string
 export interface TurnOptions {
   petWindow: BrowserWindow | null
   config: AppConfig
-  /** 目标会话 */
-  sessionId: string
+  /** 目标会话（ephemeralInstruction 时可为空） */
+  sessionId?: string
   /** 用户这轮说的话（正常发言） */
   text?: string
   /** 开场指令：通话刚接通由她先开口（作为隐藏用户消息写进上下文，不在界面出现） */
   opening?: string
+  /**
+   * 一次性播报：只让模型生成一句话给她说，不读也不写任何会话（主动健康提醒用）。
+   * 走和字幕模式相同的出字路径（pet:sentence），没配语音时灵动岛也能显示。
+   */
+  ephemeralInstruction?: string
   /** 远程来源（DSH 面板 / agent 桥接）：她已在远程面板里现身，桌面平板保持原状不弹出 */
   remote?: boolean
   /** 她的完整回复落盘时回调（控制桥 /chat 等外部调用方拿回复文本用；取消/失败不触发） */
@@ -150,28 +155,37 @@ export async function runTurn(options: TurnOptions): Promise<void> {
   const abort = new AbortController()
   activeTurn = { abort }
 
+  const ephemeral = typeof options.ephemeralInstruction === 'string'
   const store = loadSessions()
-  const session = store.sessions.find((s) => s.id === options.sessionId)
-  if (!session) return
+  const session = options.sessionId ? store.sessions.find((s) => s.id === options.sessionId) : undefined
+  let history: ChatMessage[]
 
-  if (typeof options.opening === 'string') {
-    const opening = openingMessage(options.opening)
-    session.messages.push(opening)
-    announceMessage(send, session.id, opening) // hidden 消息面板不展示，但保持渲染层内存同步
-  } else if (options.text) {
-    const userMessage: ChatMessage = { role: 'user', content: options.text, ts: Date.now() }
-    session.messages.push(userMessage)
-    announceMessage(send, session.id, userMessage)
-    send('pet:user-message', options.text)
+  if (ephemeral) {
+    // 一次性播报：上下文只有这句指令，不碰任何会话
+    history = [{ role: 'user', content: options.ephemeralInstruction as string, ts: Date.now() }]
   } else {
-    return
+    if (!session) return
+    if (typeof options.opening === 'string') {
+      const opening = openingMessage(options.opening)
+      session.messages.push(opening)
+      announceMessage(send, session.id, opening) // hidden 消息面板不展示，但保持渲染层内存同步
+    } else if (options.text) {
+      const userMessage: ChatMessage = { role: 'user', content: options.text, ts: Date.now() }
+      session.messages.push(userMessage)
+      announceMessage(send, session.id, userMessage)
+      // 带上会话 id：渲染层据此把这条提问补进对应聊天窗（通话中/切页时聊天窗是隐藏的）
+      send('pet:user-message', options.text, session.id)
+    } else {
+      return
+    }
+    // 第一条真实发言出现后，拿它当会话标题（开场指令不算）
+    if (!session.title) {
+      const firstUser = session.messages.find((m) => m.role === 'user' && !m.hidden)
+      session.title = firstUser ? truncate(firstUser.content, 18) : truncate(session.topic, 18) || '新的对话'
+    }
+    session.updatedAt = Date.now()
+    history = session.messages
   }
-  // 第一条真实发言出现后，拿它当会话标题（开场指令不算）
-  if (!session.title) {
-    const firstUser = session.messages.find((m) => m.role === 'user' && !m.hidden)
-    session.title = firstUser ? truncate(firstUser.content, 18) : truncate(session.topic, 18) || '新的对话'
-  }
-  session.updatedAt = Date.now()
   send('pet:state', 'thinking')
 
   const splitter = new SentenceSplitter()
@@ -183,8 +197,9 @@ export async function runTurn(options: TurnOptions): Promise<void> {
   /** 本轮是否真的播出了音频：有音频时说话动画完全跟音频走 */
   let audioStarted = false
   const ttsReady = isTtsReady(options.config.tts)
-  /** 字幕模式（配了语音）：文字不随 LLM 流式上屏，等这句的音频到达才出字——边说边吐字 */
-  const subtitleMode = ttsReady
+  /** 字幕模式（配了语音）：文字不随 LLM 流式上屏，等这句的音频到达才出字——边说边吐字。
+      一次性播报同样按句出字：它的句子是灵动岛胶囊/卡片的消息来源，没配语音也得有 */
+  const subtitleMode = ttsReady || ephemeral
 
   // 说话动画的开始：
   // - 配了语音：等第一个音频块到达才开始（避免"文字出来了嘴先动、声音晚两秒"）
@@ -204,7 +219,11 @@ export async function runTurn(options: TurnOptions): Promise<void> {
       if (subtitleMode) send('pet:sentence', clean)
       return
     }
-    if (!ttsReady) return
+    if (!ttsReady) {
+      // 没配语音：一次性播报也要把句子送给渲染层（灵动岛消息模式不依赖 TTS）
+      if (subtitleMode) send('pet:sentence', clean)
+      return
+    }
     let revealed = false
     const reveal = (): void => {
       if (revealed) return
@@ -277,12 +296,12 @@ export async function runTurn(options: TurnOptions): Promise<void> {
       systemPrompt(activeSkinDir(options.config)) +
       memeBlock +
       profilePrompt() +
-      (await recallForTurn(options.config.llm, options.text ?? '', options.sessionId)) +
+      (ephemeral ? '' : await recallForTurn(options.config.llm, options.text ?? '', options.sessionId ?? '')) +
       dshActivityPrompt()
     const streamed = await streamChat({
       config: options.config.llm,
       system,
-      history: session.messages,
+      history,
       signal: abort.signal,
       onDelta: (delta) => {
         full += delta
@@ -305,20 +324,24 @@ export async function runTurn(options: TurnOptions): Promise<void> {
     enqueueSpeak(splitter.flush().join(''))
 
     const { display, emotion } = extractEmotion(streamed)
-    const assistantMessage: ChatMessage = {
-      role: 'assistant',
-      content: display,
-      emotion,
-      ts: Date.now()
+    if (session) {
+      const assistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: display,
+        emotion,
+        ts: Date.now()
+      }
+      session.messages.push(assistantMessage)
+      session.updatedAt = Date.now()
+      announceMessage(send, session.id, assistantMessage)
+      saveSessions(store)
     }
-    session.messages.push(assistantMessage)
-    session.updatedAt = Date.now()
-    announceMessage(send, session.id, assistantMessage)
-    saveSessions(store)
     options.onAssistant?.(display, emotion) // 回复已定稿，外部调用方（控制桥 /chat）可拿走了
-    scheduleProfileExtraction(options.sessionId, options.config.llm)
-    scheduleSummary(options.sessionId, options.config.llm)
-    scheduleMoodUpdate(options.config.llm)
+    if (session && options.sessionId) {
+      scheduleProfileExtraction(options.sessionId, options.config.llm)
+      scheduleSummary(options.sessionId, options.config.llm)
+      scheduleMoodUpdate(options.config.llm)
+    }
 
     // 字幕模式下正文由 pet:sentence 逐句出过了，这里只带情绪，避免整段文字瞬间跳出来
     send('pet:llm-done', { text: subtitleMode ? '' : display, emotion })
@@ -344,7 +367,7 @@ export async function runTurn(options: TurnOptions): Promise<void> {
       send('pet:error', message)
       // 流中断时她已经说出口的半截话也要落盘：不然上下文里"她说过"的内容凭空消失
       const { display, emotion } = extractEmotion(full)
-      if (display) {
+      if (display && session) {
         const partial: ChatMessage = { role: 'assistant', content: display, emotion, ts: Date.now() }
         session.messages.push(partial)
         session.updatedAt = Date.now()

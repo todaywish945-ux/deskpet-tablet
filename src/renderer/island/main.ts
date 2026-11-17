@@ -1,6 +1,6 @@
 /**
  * 灵动岛渲染层：胶囊（头像+名字+时钟/她说的最新一句+状态点）⇄ 展开卡片。
- * 动效参考先前实现：弹簧物理（16ms 半隐式欧拉，静止时完全不跑）驱动果冻形变，
+ * 动效抄大肥鱼：弹簧物理（16ms 半隐式欧拉，静止时完全不跑）驱动果冻形变，
  * 几何由主进程 setBounds 一步到位、内容过渡在 CSS 180ms ease-out-cubic。
  */
 
@@ -17,23 +17,7 @@ const ovClockEl = document.getElementById('ov-clock') as HTMLDivElement
 const lastMsgEl = document.getElementById('last-msg') as HTMLDivElement
 const stripDotEl = document.getElementById('strip-dot') as HTMLElement
 
-// 头像随皮肤：启动和每次配置变更都拉 skin.json 刷新（切皮肤后旧头像会一直挂着）
-async function refreshSkinAvatar(): Promise<void> {
-  try {
-    const meta = (await (await fetch(`petasset://skin/skin.json?ts=${Date.now()}`)).json()) as { avatar?: string }
-    if (!meta.avatar) return
-    const url = `petasset://skin/${meta.avatar}`
-    for (const img of document.querySelectorAll<HTMLImageElement>('img')) {
-      if (img.src.includes('/avatar.') || img.src.includes('avatar')) img.src = url
-    }
-  } catch {
-    // 取不到就保持现状
-  }
-}
-void refreshSkinAvatar()
-api.on('pet:config-changed', () => {
-  void refreshSkinAvatar()
-})
+// 头像位已固定为敲敲图标（assets/icons/knock-knock.svg），不再随皮肤切换
 
 // ---------- 时钟 ----------
 
@@ -288,7 +272,7 @@ function collapseCard(): void {
   setTimeout(() => void api.collapseApply(), 200) // 等 180ms 收起动画播完
 }
 
-// 15s 自动收起，悬停暂停（先前实现同款）
+// 15s 自动收起，悬停暂停（大肥鱼同款）
 let autoTimer: ReturnType<typeof setTimeout> | null = null
 let remaining = 15_000
 let deadline = 0

@@ -11,7 +11,7 @@ import { TTSConfig } from '../../shared/types'
  *   cwd 指到整合包目录，全部输出落 userData/logs/gsv-autostart.log，起不来一查便知。
  */
 
-const DEFAULT_LAUNCHER = ''
+const DEFAULT_LAUNCHER = 'D:\\GPT-SoVITS\\GPT-SoVITS-v2pro-20261006nvidia50x0\\yeshung-voice.bat'
 
 /** 同一次运行里拉起过就不再重复，5 分钟冷却兜底 */
 let lastLaunchAt = 0
@@ -45,7 +45,7 @@ export async function ensureGsvService(config: TTSConfig): Promise<boolean> {
   const gsvDir = dirname(config.gsvLauncherPath?.trim() || DEFAULT_LAUNCHER)
   const python = join(gsvDir, 'runtime', 'python.exe')
   if (!existsSync(python)) {
-    console.error('[gsv] 自动拉起跳过：未找到整合包 python——请先在设置里填 GPT-SoVITS 整合包路径，或检查路径是否为纯英文：', python)
+    console.error('[gsv] 自动拉起跳过：找不到整合包 python：', python)
     return false
   }
 

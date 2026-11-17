@@ -244,7 +244,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     // DSH 页面（另一个端口）要跨域读它在不在线，/health 只读、无敏感信息，放开来源
     sendJson(res, 200, {
       ok: true,
-      app: 'deskpet-tablet',
+      app: 'ye-shunguang-deskpet',
       version: app.getVersion(),
       dev: !app.isPackaged,
       ttsReady: isTtsReady(config.tts),

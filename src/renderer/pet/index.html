@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>叶瞬光</title>
+    <title>敲敲</title>
     <link rel="stylesheet" href="./style.css" />
     <!-- Live2D 渲染后端三件套（顺序铁律：cubismcore → pixi → lipsyncpatch）；
          非 Live2D 皮肤时只是多加载三个全局脚本，无副作用 -->
@@ -19,67 +19,146 @@
         <img id="wallpaper" alt="" draggable="false" />
         <div id="char-layer"></div>
 
-        <!-- 主界面：历史会话 + 今天想聊点什么 -->
+        <!-- 主界面：Knock Knock 应用（头条 + 联系人栏 + 聊天窗） -->
         <div id="home-view" class="view">
-          <aside id="home-side">
-            <div class="side-title">叶瞬光</div>
-            <button id="new-session-btn" type="button">＋ 新的会话</button>
-            <button id="manage-sessions-btn" type="button">管理</button>
-            <div id="batch-bar" class="hidden">
-              <button id="batch-select-all" type="button">全选</button>
-              <button id="batch-delete" type="button" disabled>删除所选</button>
-              <button id="batch-cancel" type="button">完成</button>
-            </div>
-            <div id="session-list"></div>
-            <button id="profile-btn" type="button" title="她长期记住的关于你的事">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.9-9.7-9.2C.7 8.6 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4L12 9l2-1.6C14.8 6.1 16.2 5 18.2 5c3.4 0 5.1 3.6 3.5 6.8C19.5 16.1 12 21 12 21z"/></svg>
-              <span>她记住的</span>
-              <span id="profile-count" class="hidden"></span>
-            </button>
-            <button id="settings-btn" type="button" title="设置">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 000-2l2.1-1.6a.5.5 0 00.1-.7l-2-3.4a.5.5 0 00-.6-.2l-2.5 1a7.6 7.6 0 00-1.7-1l-.4-2.6a.5.5 0 00-.5-.5h-4a.5.5 0 00-.5.4l-.4 2.6a7.6 7.6 0 00-1.7 1l-2.5-1a.5.5 0 00-.6.2l-2 3.4a.5.5 0 00.1.6L4.6 11a7.5 7.5 0 000 2l-2.1 1.6a.5.5 0 00-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 001.7 1l.4 2.6c0 .3.3.5.5.5h4c.2 0 .5-.2.5-.4l.4-2.6a7.6 7.6 0 001.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 00-.1-.7L19.4 13zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
-              <span>设置</span>
-            </button>
-          </aside>
-          <div id="home-main">
-            <!-- 新会话：定主题 -->
-            <div id="topic-view">
-              <div id="home-greet">今天想聊点什么？</div>
-              <div id="home-sub">定个话题，她来陪你——心事、焦虑、还是随便唠唠都行。</div>
-              <div id="topic-chips">
-                <button class="chip" type="button">随便聊聊</button>
-                <button class="chip" type="button">最近有点焦虑</button>
-                <button class="chip" type="button">今天发生的事</button>
-                <button class="chip" type="button">心事想找人说说</button>
-                <button class="chip" type="button">帮我放松一下</button>
-                <button class="chip" type="button">睡不着，想聊天</button>
+          <div id="kk-header">
+            <img class="kk-logo" src="petasset://assets/icons/knock-knock.svg" alt="" draggable="false" />
+            <span>Knock Knock</span>
+          </div>
+          <div id="kk-body">
+            <aside id="home-side">
+              <!-- 顶部三键选项卡（游戏敲敲：邀约/私信/群聊；图标来自 ZZZ-Chat 描的游戏 glyph，
+                   邀约是白色 glyph、私信/群聊是黑色——靠 invert 在暗底/黄底间切换可见性） -->
+              <div id="kk-tabs">
+                <button id="tab-video" class="tab" type="button" title="邀约视频通话">
+                  <img src="petasset://assets/icons/tab-invite.png" alt="" draggable="false" />
+                </button>
+                <button id="tab-chat" class="tab on" type="button" title="私信">
+                  <img src="petasset://assets/icons/tab-dm.png" alt="" draggable="false" />
+                </button>
+                <button id="tab-group" class="tab" type="button" title="群聊">
+                  <img src="petasset://assets/icons/tab-group.png" alt="" draggable="false" />
+                </button>
               </div>
-              <input id="topic-input" type="text" placeholder="想聊什么，直接写下来…" autocomplete="off" />
-              <button id="start-call-btn" type="button">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 3.5v-10l-4 3.5z"/></svg>
-                <span>开始视频通话</span>
+
+              <!-- 邀约页侧栏：联系人（在线状态） -->
+              <div id="side-video" class="hidden">
+                <div class="side-label">联系人</div>
+                <div class="video-contact">
+                  <img class="s-avatar" src="petasset://skin/avatar.png" alt="" draggable="false" />
+                  <div class="s-meta">
+                    <div class="t" id="video-contact-name">叶瞬光</div>
+                    <div class="online">在线<span class="o-dots">…</span></div>
+                  </div>
+                </div>
+                <div class="side-divider"><i></i><span>Info</span><i></i></div>
+                <div id="side-info">
+                  发起邀约后她会以视频通话的形式接通
+                </div>
+              </div>
+
+              <!-- 私信页侧栏：角色分组树（智谱项目→任务式：角色行下拉直接挂会话） -->
+              <div id="side-chat">
+                <div class="side-divider"><i></i><span>Choose</span><i></i></div>
+                <div class="side-label-row">
+                  <span class="side-label">Messaging</span>
+                  <button id="manage-sessions-btn" type="button">管理</button>
+                </div>
+                <div id="batch-bar" class="hidden">
+                  <button id="batch-select-all" type="button">全选</button>
+                  <button id="batch-delete" type="button" disabled>删除所选</button>
+                  <button id="batch-cancel" type="button">完成</button>
+                </div>
+                <!-- 角色组头常驻（没有会话时也在，＋ 和爱心随时可点） -->
+                <div id="char-group-head" class="char-group-head">
+                  <img id="group-avatar" class="g-avatar" src="petasset://skin/avatar.png" alt="" draggable="false" />
+                  <span id="group-name" class="g-name">叶瞬光</span>
+                  <button id="profile-btn" class="g-heart" type="button" title="她记住的关于你">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.9-9.7-9.2C.7 8.6 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4L12 9l2-1.6C14.8 6.1 16.2 5 18.2 5c3.4 0 5.1 3.6 3.5 6.8C19.5 16.1 12 21 12 21z"/></svg>
+                  </button>
+                  <button id="new-session-btn" class="g-add" type="button" title="和她开个新会话">＋</button>
+                  <i id="group-chevron" class="g-chevron">▾</i>
+                </div>
+                <div id="session-list"></div>
+              </div>
+
+              <!-- 群聊页侧栏：空槽位（游戏同款 NoData/Empty） -->
+              <div id="side-group" class="hidden">
+                <div class="side-label">群聊</div>
+                <div class="group-slot"><span class="no-x">⊗</span><div class="no-meta"><div class="no-t">NoData</div><div class="no-s">Empty</div></div></div>
+                <div class="group-slot"><span class="no-x">⊗</span><div class="no-meta"><div class="no-t">NoData</div><div class="no-s">Empty</div></div></div>
+                <div class="group-slot"><span class="no-x">⊗</span><div class="no-meta"><div class="no-t">NoData</div><div class="no-s">Empty</div></div></div>
+              </div>
+
+              <button id="settings-btn" type="button" title="设置">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.5 7.5 0 000-2l2.1-1.6a.5.5 0 00.1-.7l-2-3.4a.5.5 0 00-.6-.2l-2.5 1a7.6 7.6 0 00-1.7-1l-.4-2.6a.5.5 0 00-.5-.5h-4a.5.5 0 00-.5.4l-.4 2.6a7.6 7.6 0 00-1.7 1l-2.5-1a.5.5 0 00-.6.2l-2 3.4a.5.5 0 00.1.6L4.6 11a7.5 7.5 0 000 2l-2.1 1.6a.5.5 0 00-.1.7l2 3.4c.1.2.4.3.6.2l2.5-1a7.6 7.6 0 001.7 1l.4 2.6c0 .3.3.5.5.5h4c.2 0 .5-.2.5-.4l.4-2.6a7.6 7.6 0 001.7-1l2.5 1c.2.1.5 0 .6-.2l2-3.4a.5.5 0 00-.1-.7L19.4 13zM12 15.5A3.5 3.5 0 1112 8.5a3.5 3.5 0 010 7z"/></svg>
+                <span>设置</span>
               </button>
-            </div>
-            <!-- 已有会话：直接看这段对话 -->
-            <div id="session-view" class="hidden">
-              <div id="session-head">
-                <span id="session-title"></span>
-                <span id="session-when"></span>
+            </aside>
+            <div id="home-main">
+              <!-- 聊天窗：常驻（ZZZ-Chat 式空态），直接打字聊（视频通话在邀约页和窗口按钮） -->
+              <div id="session-view">
+                <div id="session-head">
+                  <svg class="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12.0016C2.0005 9.80922 2.72148 7.67774 4.05198 5.93522C5.38249 4.19269 7.24877 2.9357 9.3636 2.3577C11.4784 1.77969 13.7246 1.91271 15.7565 2.73628C17.7883 3.55984 19.4932 5.02831 20.6087 6.91569C21.7243 8.80307 22.1886 11.0047 21.9304 13.1819C21.6721 15.359 20.7055 17.391 19.1794 18.965C17.6533 20.539 15.6521 21.5678 13.484 21.8932C11.3159 22.2185 9.10092 21.8224 7.18 20.7656L3.292 21.9496C3.11858 22.0024 2.93407 22.0071 2.75819 21.9632C2.58231 21.9192 2.42168 21.8283 2.2935 21.7001C2.16531 21.5719 2.07438 21.4113 2.03043 21.2354C1.98648 21.0596 1.99117 20.875 2.044 20.7016L3.228 16.8076C2.42153 15.3342 1.9992 13.6813 2 12.0016Z"/></svg>
+                  <span id="session-title"></span>
+                  <span id="session-when"></span>
+                </div>
+                <div id="session-preview"></div>
+                <form id="home-inputbar">
+                  <input id="home-chat-input" type="text" placeholder="Type a message…" autocomplete="off" maxlength="2000" />
+                  <button id="home-call-btn" type="button" title="视频通话">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 3.5v-10l-4 3.5z"/></svg>
+                  </button>
+                  <button id="home-send-btn" type="submit" title="发送">➤</button>
+                </form>
               </div>
-              <div id="session-preview"></div>
-              <button id="resume-call-btn" type="button">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 3.5v-10l-4 3.5z"/></svg>
-                <span>继续视频通话</span>
-              </button>
-            </div>
-            <!-- 档案记忆面板：她长期记住的关于你的事 -->
-            <div id="profile-panel" class="hidden">
-              <div id="profile-head">
-                <span>她记住的关于你</span>
-                <button id="profile-close" type="button" title="关闭">×</button>
+              <!-- 邀约页（游戏敲敲「邀约」同款）：角色卡 + 邀约按钮 = 发起视频通话 -->
+              <div id="invite-view" class="hidden">
+                <div id="invite-card">
+                  <div class="invite-band"></div>
+                  <img id="invite-avatar" src="petasset://skin/avatar.png" alt="" draggable="false" />
+                  <div id="invite-nameplate"><span id="invite-name">叶瞬光</span><span class="face-icon">☺</span></div>
+                  <div id="invite-impression">
+                    <div class="imp-title" id="imp-title">对叶瞬光的印象：</div>
+                    <div class="imp-text" id="imp-text">聊得多了，这里就会写下对你的印象</div>
+                  </div>
+                  <div id="invite-topic">
+                    <div class="it-label">今天想聊点什么？</div>
+                    <div id="topic-chips">
+                      <button class="chip" type="button">随便聊聊</button>
+                      <button class="chip" type="button">最近有点焦虑</button>
+                      <button class="chip" type="button">今天发生的事</button>
+                      <button class="chip" type="button">心事想找人说说</button>
+                      <button class="chip" type="button">帮我放松一下</button>
+                      <button class="chip" type="button">睡不着，想聊天</button>
+                    </div>
+                    <input id="topic-input" type="text" placeholder="想聊什么，直接写下来…（回车邀约）" autocomplete="off" />
+                  </div>
+                  <div class="invite-actions">
+                    <button id="invite-btn" type="button">邀约</button>
+                    <button id="invite-star" class="invite-star" type="button" title="喜欢这位代理人" aria-pressed="false">★</button>
+                  </div>
+                </div>
               </div>
-              <div id="profile-list"></div>
-              <div id="profile-tip">每场通话结束后她会自己回忆整理；不想让她记的可以删掉。</div>
+
+              <!-- 群聊页（游戏「群聊」同款空态） -->
+              <div id="group-view" class="hidden">
+                <div id="group-head">
+                  <svg class="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 11a3 3 0 110-6 3 3 0 010 6zM3 18.4c.5-2.9 2.7-4.6 5.5-4.6 1.4 0 2.7.4 3.7 1.2-1.3 1-2.1 2.2-2.4 3.9L9.6 20H3.4L3 18.4zM16.5 11.6a2.6 2.6 0 110-5.2 2.6 2.6 0 010 5.2zm-3.2 8.4l.2-1.3c.4-2.3 2.1-3.7 4.5-3.7 2 0 3.6 1 4.2 2.9l.4 1.2h-9.3z"/></svg>
+                  <span>群聊</span>
+                </div>
+                <div id="group-empty">群聊功能筹备中——以后可以拉多个角色进同一间屋子</div>
+              </div>
+
+              <!-- 档案记忆面板：她长期记住的关于你的事 -->
+              <div id="profile-panel" class="hidden">
+                <div id="profile-head">
+                  <span class="ph-title">她记住的关于你<span id="profile-count" class="hidden"></span></span>
+                  <button id="profile-close" type="button" title="关闭">×</button>
+                </div>
+                <div id="profile-list"></div>
+                <div id="profile-tip">每场通话结束后她会自己回忆整理；不想让她记的可以删掉。</div>
+              </div>
             </div>
           </div>
         </div>
@@ -113,8 +192,15 @@
           </div>
 
           <div id="chat-area">
-            <div id="bubble" class="hidden"><span id="bubble-text"></span></div>
-            <div id="user-toast" class="hidden"></div>
+            <!-- 敲敲式消息行：头像 + 气泡（隐藏类挂在行上，头像随气泡一起显隐） -->
+            <div id="bubble-row" class="msg-row her hidden">
+              <img id="bubble-avatar" class="kk-avatar" alt="" draggable="false" />
+              <div id="bubble" class="hidden"><span id="bubble-text"></span></div>
+            </div>
+            <div id="toast-row" class="msg-row me hidden">
+              <span class="kk-avatar kk-avatar-user"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 5v1h14v-1c0-3-3-5-7-5z"/></svg></span>
+              <div id="user-toast" class="hidden"></div>
+            </div>
           </div>
 
           <div id="call-bar">
@@ -129,7 +215,10 @@
 
           <aside id="history-panel">
             <div class="panel-head">
-              <span>聊天记录</span>
+              <span class="panel-title">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12.0016C2.0005 9.80922 2.72148 7.67774 4.05198 5.93522C5.38249 4.19269 7.24877 2.9357 9.3636 2.3577C11.4784 1.77969 13.7246 1.91271 15.7565 2.73628C17.7883 3.55984 19.4932 5.02831 20.6087 6.91569C21.7243 8.80307 22.1886 11.0047 21.9304 13.1819C21.6721 15.359 20.7055 17.391 19.1794 18.965C17.6533 20.539 15.6521 21.5678 13.484 21.8932C11.3159 22.2185 9.10092 21.8224 7.18 20.7656L3.292 21.9496C3.11858 22.0024 2.93407 22.0071 2.75819 21.9632C2.58231 21.9192 2.42168 21.8283 2.2935 21.7001C2.16531 21.5719 2.07438 21.4113 2.03043 21.2354C1.98648 21.0596 1.99117 20.875 2.044 20.7016L3.228 16.8076C2.42153 15.3342 1.9992 13.6813 2 12.0016Z" opacity=".55"/></svg>
+                <span>聊天记录</span>
+              </span>
               <button id="history-close" type="button" title="收起">×</button>
             </div>
             <div id="history-list"></div>

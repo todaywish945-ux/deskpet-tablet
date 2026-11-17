@@ -18,7 +18,7 @@ export function panelHtml(port: number, token: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>桌宠 · 视频通话</title>
+<title>叶瞬光 · 视频通话</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; }
@@ -377,8 +377,8 @@ var AnimationPlayer = /** @class */ (function () {
     this.stuckTicks = 0;
     this.activeLoop = null;
     this.preloadTimer = null;
-    this.IDLE_STICKER = 'placeholder-idle.png';
-    this.TALK_STICKER = 'placeholder-talk.png';
+    this.IDLE_STICKER = '22-red-daily-listening.png';
+    this.TALK_STICKER = '23-red-daily-yes.png';
   }
   AnimationPlayer.prototype.init = function () {
     var _this = this;

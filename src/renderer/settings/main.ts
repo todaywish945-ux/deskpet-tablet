@@ -8,11 +8,15 @@ const fields = {
   llmBase: $<HTMLInputElement>('llm-base'),
   llmKey: $<HTMLInputElement>('llm-key'),
   llmModel: $<HTMLInputElement>('llm-model'),
+  llmBackupBase: $<HTMLInputElement>('llm-backup-base'),
+  llmBackupKey: $<HTMLInputElement>('llm-backup-key'),
+  llmBackupModel: $<HTMLInputElement>('llm-backup-model'),
   winLayer: $<HTMLSelectElement>('win-layer'),
   skinSelect: $<HTMLSelectElement>('skin-select'),
   winIsland: $<HTMLInputElement>('win-island'),
   winIslandIdle: $<HTMLSelectElement>('win-island-idle'),
   proActive: $<HTMLInputElement>('pro-active'),
+  proHealth: $<HTMLInputElement>('pro-health'),
   appAutoStart: $<HTMLInputElement>('app-autostart'),
   callBargeIn: $<HTMLInputElement>('call-bargein'),
   ttsEnabled: $<HTMLInputElement>('tts-enabled'),
@@ -70,11 +74,15 @@ function fillForm(data: AppConfig): void {
   fields.llmBase.value = data.llm.baseUrl
   fields.llmKey.value = data.llm.apiKey
   fields.llmModel.value = data.llm.model
+  fields.llmBackupBase.value = data.llm.backup?.baseUrl ?? ''
+  fields.llmBackupKey.value = data.llm.backup?.apiKey ?? ''
+  fields.llmBackupModel.value = data.llm.backup?.model ?? ''
   fields.winLayer.value = data.window?.layer ?? 'bottom'
   void fillSkinOptions(data.character?.skin)
   fields.winIsland.checked = data.window?.island ?? true
   fields.winIslandIdle.value = String(data.window?.islandIdleSeconds ?? 10)
   fields.proActive.checked = data.proactive?.enabled ?? true
+  fields.proHealth.checked = data.proactive?.health ?? true
   fields.appAutoStart.checked = data.app?.autoStart ?? false
   fields.callBargeIn.checked = data.call?.bargeIn ?? true
   fields.ttsEnabled.checked = data.tts.enabled
@@ -96,10 +104,17 @@ function collectConfig(): AppConfig {
     llm: {
       baseUrl: fields.llmBase.value.trim() || 'https://open.bigmodel.cn/api/paas/v4',
       apiKey: fields.llmKey.value.trim(),
-      model: fields.llmModel.value.trim() || 'glm-5.3-flash'
+      model: fields.llmModel.value.trim() || 'glm-5.3-flash',
+      backup: {
+        baseUrl: fields.llmBackupBase.value.trim(),
+        apiKey: fields.llmBackupKey.value.trim(),
+        model: fields.llmBackupModel.value.trim()
+      }
     },
     character: {
-      skin: fields.skinSelect.value
+      skin: fields.skinSelect.value,
+      // 邀约卡星标在平板里点亮/熄灭：设置页保存时原样保留
+      favorite: config.character.favorite ?? false
     },
     window: {
       layer: (fields.winLayer.value as PetLayerMode) || 'bottom',
@@ -107,7 +122,8 @@ function collectConfig(): AppConfig {
       islandIdleSeconds: Number(fields.winIslandIdle.value) || 10
     },
     proactive: {
-      enabled: fields.proActive.checked
+      enabled: fields.proActive.checked,
+      health: fields.proHealth.checked
     },
     app: {
       autoStart: fields.appAutoStart.checked
@@ -177,7 +193,7 @@ testBtn.addEventListener('click', async () => {
   try {
     config = collectConfig()
     await api.saveConfig(config)
-    const { wav } = await api.testVoice('你好呀，我是桌宠。声音听起来还像吗？')
+    const { wav } = await api.testVoice('你好呀，我是叶瞬光。声音听起来还像吗？')
     const audio = new Audio(`data:audio/wav;base64,${wav}`)
     void audio.play()
     setStatus('试听播放中…')

@@ -1,4 +1,6 @@
+import { powerMonitor } from 'electron'
 import { getPetWindow } from '../petWindow'
+import { showTablet } from '../island'
 import { loadConfig, loadSessions, newSession, saveSessions } from './store'
 import { runTurn, isTurnActive } from './chatPipeline'
 import { getActiveSessionId, setActiveSession } from './sessionState'
@@ -15,7 +17,8 @@ function hasUserActivityToday(startOfToday: number): boolean {
 /**
  * 她主动开口：闲置关心 / 早安 / 深夜劝休息 / 心情周回顾。
  * 复用 runTurn 的 opening 隐藏消息机制——对对话管线零侵入。
- * 规则：深夜（0:00–7:30）完全静默；冷却期内不重复；平板被隐藏时不打扰。
+ * 规则：深夜（0:00–7:30）完全静默；冷却期内不重复；平板被隐藏且没开灵动岛时不打扰。
+ * 健康提醒只走灵动岛：不拉起平板、不写聊天记录（一次性播报）。
  */
 
 // PET_PROACTIVE_TEST=1：压短全部阈值做端到端验证
@@ -23,6 +26,9 @@ const TEST = process.env['PET_PROACTIVE_TEST'] === '1'
 const IDLE_MS = TEST ? 20_000 : 90 * 60_000
 const MIN_GAP_MS = TEST ? 40_000 : 90 * 60_000
 const TICK_MS = TEST ? 10_000 : 60_000
+const HEALTH_INTERVAL_MIN = TEST ? 1 : 45 // 连续用电脑多久提醒一次（分钟）
+let healthStreakMin = 0
+let healthTurn = 0
 
 let lastActivityAt = Date.now()
 let lastProactiveAt = 0
@@ -56,8 +62,17 @@ function pickSessionId(): string | null {
   return session.id
 }
 
-function fire(instruction: string): void {
+function fire(instruction: string, ephemeral = false): void {
   lastProactiveAt = Date.now()
+  if (ephemeral) {
+    // 健康提醒：一次性播报——不建会话、不读不写聊天记录，句子走灵动岛胶囊/卡片展示
+    void runTurn({
+      petWindow: getPetWindow(),
+      config: loadConfig(),
+      ephemeralInstruction: instruction
+    })
+    return
+  }
   const sessionId = pickSessionId()
   if (!sessionId) return
   void runTurn({
@@ -73,7 +88,8 @@ function tick(): void {
     const config = loadConfig()
     if (!config.proactive.enabled) return
     const win = getPetWindow()
-    if (win && !win.isVisible()) return // 用户明确藏起了平板：别出声打扰
+    const hidden = !!win && !win.isVisible()
+    if (hidden && !config.window.island) return // 用户明确藏起了平板（未开岛）：静默
     if (isTurnActive()) return
 
     const now = new Date()
@@ -82,31 +98,37 @@ function tick(): void {
     const today = localDate(now)
     const idleMs = Date.now() - lastActivityAt
 
+    // 健康 streak：电脑前连续 active 的分钟数（系统级键鼠空闲 2 分钟内算还在用）
+    if (powerMonitor.getSystemIdleTime() <= 120) healthStreakMin += 1
+    else healthStreakMin = 0
+
+    // ---- 先决定"有没有话要说"，有话才把平板从岛态唤回 ----
+    let instruction = ''
+    /** 只走灵动岛：不拉起平板、不落会话（健康提醒是路边一句话，不进聊天记录） */
+    let islandOnly = false
+
     // 早安：早上第一次露面（跨夜挂着或早上全新启动都算），且今天还没聊过天
     if (minutes < 11 * 60 && morningDate !== today) {
       const startOfToday = new Date(now).setHours(0, 0, 0, 0)
       morningDate = today
       if (lastActivityAt < startOfToday || !hasUserActivityToday(startOfToday)) {
-        fire(
+        instruction =
           `（现在是早上 ${now.getHours()} 点多，这是你今天主动发出的第一句问候。自然地道个早安，` +
-            '可以顺着你记得的对方近况关心一句，轻松简短，一两句话就好。）'
-        )
-        return
+          '可以顺着你记得的对方近况关心一句，轻松简短，一两句话就好。）'
       }
     }
 
     // 深夜劝休息：22:30 之后还挂着且半天没动静
-    if (minutes >= 22 * 60 + 30 && nightDate !== today && idleMs >= 45 * 60_000) {
+    if (!instruction && minutes >= 22 * 60 + 30 && nightDate !== today && idleMs >= 45 * 60_000) {
       nightDate = today
-      fire(
+      instruction =
         `（现在已经晚上 ${now.getHours()} 点 ${now.getMinutes()} 分了，对方很久没有说话。` +
-          '你主动轻声提醒一句：夜深了，早点休息。温柔、简短，不要唠叨说教。）'
-      )
-      return
+        '你主动轻声提醒一句：夜深了，早点休息。温柔、简短，不要唠叨说教。）'
     }
 
     // 心情周回顾：攒够一周数据且至少间隔 7 天，挑对方闲着的时候说
     if (
+      !instruction &&
       minutes >= 9 * 60 &&
       minutes < 22 * 60 &&
       idleMs >= 10 * 60_000 &&
@@ -127,24 +149,43 @@ function tick(): void {
           .slice(-7)
           .map((d) => `${d.date.slice(5)}：${d.score} 分，${d.note}`)
           .join('\n')
-        fire(
+        instruction =
           '（你刚回顾了对方最近一周的心情记录，想主动和对方聊聊这一周的状态。这是记录：\n' +
-            `${notes}\n${trend ? trend + '\n' : ''}` +
-            '用温柔自然的口吻说出你的观察和关心，肯定好的变化、心疼低落的日子，别像念报告，三四句话以内。）'
-        )
-        return
+          `${notes}\n${trend ? trend + '\n' : ''}` +
+          '用温柔自然的口吻说出你的观察和关心，肯定好的变化、心疼低落的日子，别像念报告，三四句话以内。）'
       }
     }
 
     // 闲置关心：太久没说话了，随口关心一句
-    if (idleMs >= IDLE_MS && Date.now() - lastProactiveAt >= MIN_GAP_MS) {
+    if (!instruction && idleMs >= IDLE_MS && Date.now() - lastProactiveAt >= MIN_GAP_MS) {
       const hours = Math.floor(idleMs / 3_600_000)
       const idleText = hours >= 1 ? `${hours} 个小时` : `${Math.floor(idleMs / 60_000)} 分钟`
-      fire(
+      instruction =
         `（对方已经 ${idleText} 没和你说话了。你现在主动发一条消息关心一下：` +
-          '结合现在的时间和你记得的对方近况，像朋友随口惦记那样自然，一两句话，别问「在吗」。）'
-      )
+        '结合现在的时间和你记得的对方近况，像朋友随口惦记那样自然，一两句话，别问「在吗」。）'
     }
+
+    // 健康提醒：连续用电脑太久 → 喝水 / 起来活动活动（交替）
+    if (
+      !instruction &&
+      config.proactive.health &&
+      healthStreakMin >= HEALTH_INTERVAL_MIN &&
+      Date.now() - lastProactiveAt >= (TEST ? 40_000 : 10 * 60_000)
+    ) {
+      healthStreakMin = 0
+      healthTurn = (healthTurn + 1) % 2
+      islandOnly = true
+      instruction =
+        healthTurn === 0
+          ? `（对方已经连续用电脑 ${HEALTH_INTERVAL_MIN} 分钟了。你主动提醒一句：喝口水、让眼睛歇歇。轻快俏皮，一句话，可以带点你的小性格。）`
+          : `（对方坐了很久没起来过了。你提醒TA起来活动活动、伸个懒腰走两步。轻快俏皮，一句话。）`
+    }
+
+    if (!instruction) return
+
+    // 有话要说才唤回：岛态/隐藏 → 不抢焦点地把平板请出来（健康提醒除外：留在灵动岛说）
+    if (hidden && !islandOnly) showTablet(false, true)
+    fire(instruction, islandOnly)
   } catch (error) {
     console.error('[proactive]', error)
   }

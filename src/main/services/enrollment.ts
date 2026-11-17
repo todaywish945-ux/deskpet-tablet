@@ -53,7 +53,7 @@ export interface EnrollResult {
  * 注册克隆音色（一次性）：上传 assets/voice/reference.mp3 → create_voice。
  * target_model 必须与之后合成用的模型一致。
  */
-export async function enrollVoice(config: TTSConfig, assetRoot: string, namePrefix = 'deskpet'): Promise<EnrollResult> {
+export async function enrollVoice(config: TTSConfig, assetRoot: string, namePrefix = 'yeshunguang'): Promise<EnrollResult> {
   if (!config.apiKey) throw new TTSError('请先填写百炼 API Key。')
   if (!config.model) throw new TTSError('请先选择语音模型。')
 

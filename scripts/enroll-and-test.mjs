@@ -146,7 +146,7 @@ const totalPcm = pcmChunks.reduce((n, c) => n + c.length, 0)
 console.log(`  合成 OK：${totalPcm} 字节 PCM ≈ ${(totalPcm / 2 / 24000).toFixed(1)} 秒音频`)
 
 // ── 写入应用配置（合并写入：只更新注册结果相关的 tts 字段，保留用户已有配置）──
-const dataDir = join(process.env.APPDATA, 'deskpet-tablet', 'data')
+const dataDir = join(process.env.APPDATA, 'ye-shunguang-deskpet', 'data')
 mkdirSync(dataDir, { recursive: true })
 const configFile = join(dataDir, 'config.json')
 let config = {}

@@ -1,21 +1,15 @@
 import { Tray, Menu, app, nativeImage } from 'electron'
 import { join } from 'path'
-import { existsSync } from 'fs'
-import { activeSkinDir, activeSkinMeta, loadConfig } from './services/store'
+import { assetRoot, loadConfig } from './services/store'
 import { getPetWindow } from './petWindow'
 import { createSettingsWindow } from './settingsWindow'
 import { toggleIslandEnabled, showTablet, toggleTabletVisible, collapseToIslandNow } from './island'
 
 let tray: Tray | null = null
 
-/** 托盘图标：优先当前皮肤声明的贴纸，缺省回退内置贴纸 */
+/** 托盘图标固定用敲敲的品牌图标：应用级标识，不随角色皮肤变化 */
 function trayIconPath(): string {
-  const skin = activeSkinMeta(loadConfig())
-  if (skin?.tray) {
-    const p = join(activeSkinDir(loadConfig()), skin.tray)
-    if (existsSync(p)) return p
-  }
-  return join(activeSkinDir(loadConfig()), 'stickers', 'placeholder-idle.png')
+  return join(assetRoot(), 'icons', 'knock-knock-badge.png')
 }
 
 /** 灵动岛是带勾选状态的开关：点菜单切换后、设置页改配置后都要重建，勾选态才跟手 */
@@ -35,7 +29,7 @@ function buildMenu(): Menu {
     ...(islandOn ? [{ label: '立即收成灵动岛', click: () => collapseToIslandNow() }] : []),
     { label: '设置', click: () => createSettingsWindow() },
     { type: 'separator' },
-    { label: '退出桌宠', click: () => app.quit() }
+    { label: '退出敲敲', click: () => app.quit() }
   ])
 }
 
@@ -59,7 +53,7 @@ export function createTray(): void {
     .createFromPath(trayIconPath())
     .resize({ width: 32, height: 32 })
   tray = new Tray(icon)
-  tray.setToolTip('平板桌宠')
+  tray.setToolTip('敲敲')
   tray.setContextMenu(buildMenu())
   tray.on('click', () => {
     const win = getPetWindow()

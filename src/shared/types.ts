@@ -1,9 +1,18 @@
 /** 共享类型：主进程与渲染进程共用 */
 
+/** 跨厂商兜底接口：主模型 20 秒没出字时换它先回一句（下一轮仍用主模型） */
+export interface LLMBackupConfig {
+  /** 留空 = 不启用跨厂商兜底 */
+  baseUrl: string
+  apiKey: string
+  model: string
+}
+
 export interface LLMConfig {
   baseUrl: string
   apiKey: string
   model: string
+  backup: LLMBackupConfig
 }
 
 export type TTSProvider = 'bailian' | 'gptsovits'
@@ -38,6 +47,8 @@ export interface TTSConfig {
 /** 她主动开口（闲置关心 / 早安晚安 / 周回顾） */
 export interface ProactiveConfig {
   enabled: boolean
+  /** 连续用电脑太久时提醒喝水、起来活动 */
+  health: boolean
 }
 
 export interface AppFlagsConfig {
@@ -64,6 +75,8 @@ export interface WindowConfig {
 /** 角色皮肤：skins/ 目录下的一个资源包（video 视频切片 / live2d 实时模型） */
 export interface CharacterConfig {
   skin: string
+  /** 喜欢的代理人：邀约卡星标，点亮=喜欢 */
+  favorite: boolean
 }
 
 /** skin.json 契约：渲染层按 backend 选渲染器，字段为包内相对路径 */
@@ -142,7 +155,12 @@ export const DEFAULT_CONFIG: AppConfig = {
   llm: {
     baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
     apiKey: '',
-    model: 'glm-4.5-flash'
+    model: 'glm-4.5-flash',
+    backup: {
+      baseUrl: '',
+      apiKey: '',
+      model: ''
+    }
   },
   tts: {
     enabled: true,
@@ -164,10 +182,12 @@ export const DEFAULT_CONFIG: AppConfig = {
     islandIdleSeconds: 10
   },
   character: {
-    skin: 'yeshunguang'
+    skin: 'yeshunguang',
+    favorite: false
   },
   proactive: {
-    enabled: true
+    enabled: true,
+    health: true
   },
   app: {
     autoStart: false

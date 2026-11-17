@@ -1,8 +1,8 @@
 {
-  "name": "deskpet-tablet",
+  "name": "ye-shunguang-deskpet",
   "version": "0.1.0",
-  "description": "平板桌宠框架 — 视频通话形态的 AI 桌面陪伴（框架开源版，角色素材自备）",
-  "author": "todaywish945-ux",
+  "description": "敲敲 — 视频通话形态的 AI 桌面陪伴",
+  "author": "shunguang",
   "main": "./out/main/index.js",
   "private": true,
   "scripts": {
@@ -26,8 +26,8 @@
     "ws": "^8.18.0"
   },
   "build": {
-    "appId": "com.deskpet.tablet",
-    "productName": "平板桌宠",
+    "appId": "com.shunguang.deskpet",
+    "productName": "敲敲",
     "directories": {
       "output": "dist_app"
     },
@@ -44,7 +44,8 @@
       }
     ],
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "build/icon.png"
     },
     "nsis": {
       "oneClick": false,

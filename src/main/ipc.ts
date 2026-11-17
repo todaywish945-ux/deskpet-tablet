@@ -155,6 +155,14 @@ export function registerIpc(): void {
   ipcMain.handle('profile:get', () => loadProfile())
   ipcMain.handle('profile:delete-fact', (_event, factId: string) => deleteFact(String(factId)))
 
+  // ---------- 喜欢的代理人：邀约卡星标（状态落在配置 character.favorite） ----------
+  ipcMain.handle('char:favorite-get', () => loadConfig().character.favorite)
+  ipcMain.handle('char:favorite-set', (_event, favorite: boolean) => {
+    const config = loadConfig()
+    saveConfig({ ...config, character: { ...config.character, favorite: Boolean(favorite) } })
+    return true
+  })
+
   ipcMain.handle('app:open-settings', () => {
     createSettingsWindow()
   })

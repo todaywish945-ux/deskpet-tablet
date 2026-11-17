@@ -1,4 +1,4 @@
-/* 灵动岛 —— 设计参数源自先前的桌面实现：
+/* 灵动岛 —— 设计参数抄自 D:\大肥鱼陪玩\桌宠 的灵动岛：
    胶囊高 44 全圆角 / 暗底 rgba(28,30,38,.92) / 主字 #EBEEF5 次字 #A0AABE /
    主题色 #40b8ff / 三层投影 / 顶部光泽 / 卡片圆角 18 / 按钮 28 高圆角 14 /
    几何内容动画 180ms ease-out-cubic / 悬停放大 1.02 */
@@ -25,7 +25,7 @@ body {
 }
 
 /* ============ 停靠细条 ============ */
-/* 胶囊拖到屏幕边缘 40px 内变 16px 细条贴边（先前实现四边停靠）；鼠标靠近滑出胶囊 */
+/* 胶囊拖到屏幕边缘 40px 内变 16px 细条贴边（大肥鱼四边停靠）；鼠标靠近滑出胶囊 */
 
 #strip {
   position: absolute;
@@ -35,7 +35,7 @@ body {
   align-items: center;
   justify-content: center;
   gap: 3px;
-  /* 先前实现：细条底色比胶囊更透（α210 vs 235），减少存在感 */
+  /* 大肥鱼：细条底色比胶囊更透（α210 vs 235），减少存在感 */
   background: rgba(28, 30, 38, 0.82);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
@@ -79,7 +79,7 @@ body.dock-right #strip {
   filter: brightness(1.25);
 }
 
-/* 靠屏侧 2px 主题色亮线（先前实现同款） */
+/* 靠屏侧 2px 主题色亮线（大肥鱼同款） */
 #strip-line {
   position: absolute;
   border-radius: 1px;
@@ -112,7 +112,7 @@ body.dock-right #strip-line {
   background: linear-gradient(180deg, transparent, #40b8ff, transparent);
 }
 
-/* 横条只亮状态点；竖条加小头像（先前实现竖条带 16px 头像） */
+/* 横条只亮状态点；竖条加小头像（大肥鱼竖条带 16px 头像） */
 #strip .strip-avatar {
   display: none;
 }
@@ -122,7 +122,7 @@ body.dock-right #strip .strip-avatar {
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  object-fit: cover;
+  object-fit: contain;
 }
 #strip-dot {
   width: 7px;
@@ -179,15 +179,19 @@ body.dock-right #strip .strip-avatar {
   height: 30px;
   border-radius: 50%;
   padding: 2px;
-  background: linear-gradient(135deg, #40b8ff, #2b6fd4);
+  /* 敲敲黄环：跟 Knock Knock 图标同色系（原为主题蓝） */
+  background: linear-gradient(135deg, #ffd613, #d9a600);
 }
 .avatar img {
   width: 100%;
   height: 100%;
   border-radius: 50%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
   border: 1px solid rgba(255, 255, 255, 0.35);
+  /* 深色圆底：黄环 + 黄图标之间要有对比才看得清图案 */
+  background: #21232c;
+  padding: 1px;
 }
 
 #name {
@@ -317,6 +321,9 @@ body.dock-right #strip .strip-avatar {
   max-height: 0;
   opacity: 0;
   transform: translateY(-6px);
+  /* 常驻合成层（胶囊同款）：展开过渡结束后 transform/opacity 归位会掉层，
+     透明窗上掉层的内容用过期裁剪矩形绘制——卡片底边被切掉一块且整体半透 */
+  will-change: transform, opacity;
   transition:
     max-height 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
     opacity 180ms cubic-bezier(0.215, 0.61, 0.355, 1),
@@ -343,8 +350,10 @@ body.dock-right #strip .strip-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid rgba(64, 184, 255, 0.55);
+  object-fit: contain;
+  border: 2px solid rgba(255, 214, 19, 0.6);
+  background: #21232c;
+  padding: 2px;
 }
 .ov-text {
   flex: 1;

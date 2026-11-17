@@ -8,6 +8,10 @@ const api = window.petAPI
 const bubble = document.getElementById('bubble') as HTMLDivElement
 const bubbleText = document.getElementById('bubble-text') as HTMLSpanElement
 const userToast = document.getElementById('user-toast') as HTMLDivElement
+// 敲敲式消息行：显隐类挂在行上（头像随气泡一起出现/消失）
+const bubbleRow = document.getElementById('bubble-row') as HTMLDivElement
+const toastRow = document.getElementById('toast-row') as HTMLDivElement
+const bubbleAvatar = document.getElementById('bubble-avatar') as HTMLImageElement
 const waveform = document.getElementById('waveform') as HTMLElement
 const callLabel = document.getElementById('call-label') as HTMLElement
 const form = document.getElementById('inputbar') as HTMLFormElement
@@ -17,7 +21,6 @@ const sendBtn = document.getElementById('send-btn') as HTMLButtonElement
 const homeView = document.getElementById('home-view') as HTMLDivElement
 const callView = document.getElementById('call-view') as HTMLDivElement
 const sessionList = document.getElementById('session-list') as HTMLDivElement
-const newSessionBtn = document.getElementById('new-session-btn') as HTMLButtonElement
 const manageSessionsBtn = document.getElementById('manage-sessions-btn') as HTMLButtonElement
 const batchBar = document.getElementById('batch-bar') as HTMLDivElement
 const batchSelectAllBtn = document.getElementById('batch-select-all') as HTMLButtonElement
@@ -33,17 +36,41 @@ winCloseBtn.addEventListener('click', () => void api.winClose())
 settingsBtn.addEventListener("click", () => void api.openSettings())
 const topicInput = document.getElementById('topic-input') as HTMLInputElement
 
-const topicView = document.getElementById('topic-view') as HTMLDivElement
 const sessionView = document.getElementById('session-view') as HTMLDivElement
 const sessionTitleEl = document.getElementById('session-title') as HTMLSpanElement
 const sessionWhenEl = document.getElementById('session-when') as HTMLSpanElement
 const sessionPreview = document.getElementById('session-preview') as HTMLDivElement
+// 主界面聊天窗（Knock Knock 融合）：直接打字聊，视频通话是窗口里的按钮
+const homeInputbar = document.getElementById('home-inputbar') as HTMLFormElement
+const homeChatInput = document.getElementById('home-chat-input') as HTMLInputElement
+const homeCallBtn = document.getElementById('home-call-btn') as HTMLButtonElement
+// 敲敲三选项卡：邀约（视频通话）/ 私信（聊天窗）/ 群聊（占位）
+const tabVideo = document.getElementById('tab-video') as HTMLButtonElement
+const tabChat = document.getElementById('tab-chat') as HTMLButtonElement
+const tabGroup = document.getElementById('tab-group') as HTMLButtonElement
+const sideVideo = document.getElementById('side-video') as HTMLDivElement
+const sideChat = document.getElementById('side-chat') as HTMLDivElement
+const sideGroup = document.getElementById('side-group') as HTMLDivElement
+const inviteView = document.getElementById('invite-view') as HTMLDivElement
+const groupView = document.getElementById('group-view') as HTMLDivElement
+const impTitle = document.getElementById('imp-title') as HTMLDivElement
+const impText = document.getElementById('imp-text') as HTMLDivElement
+const inviteBtn = document.getElementById('invite-btn') as HTMLButtonElement
+const inviteStar = document.getElementById('invite-star') as HTMLButtonElement | null
+const inviteName = document.getElementById('invite-name') as HTMLElement
+const videoContactName = document.getElementById('video-contact-name') as HTMLElement
 
 const profileBtn = document.getElementById('profile-btn') as HTMLButtonElement
 const profileCount = document.getElementById('profile-count') as HTMLSpanElement
 const profilePanel = document.getElementById('profile-panel') as HTMLDivElement
 const profileClose = document.getElementById('profile-close') as HTMLButtonElement
 const profileList = document.getElementById('profile-list') as HTMLDivElement
+// 敲敲侧栏：角色组头（头像/名字/爱心/＋新建/展开收起）
+const charGroupHead = document.getElementById('char-group-head') as HTMLDivElement
+const groupAvatar = document.getElementById('group-avatar') as HTMLImageElement
+const groupName = document.getElementById('group-name') as HTMLSpanElement
+const groupChevron = document.getElementById('group-chevron') as HTMLElement
+const newSessionBtn = document.getElementById('new-session-btn') as HTMLButtonElement
 
 const hangupBtn = document.getElementById('hangup-btn') as HTMLButtonElement
 const historyToggle = document.getElementById('history-toggle') as HTMLButtonElement
@@ -80,6 +107,13 @@ async function applySkin(force = false): Promise<void> {
     ? new Live2DPlayer(container, meta, base, () => pcm.level())
     : new AnimationPlayer(container, base)
   avatarUrl = `${base}/${meta.avatar}`
+  bubbleAvatar.src = avatarUrl // 消息行头像跟随皮肤
+  const charName = meta.name || '叶瞬光'
+  groupName.textContent = charName
+  groupAvatar.src = avatarUrl
+  videoContactName.textContent = charName // 邀约页联系人名
+  inviteName.textContent = charName
+  renderSessions().catch(() => {}) // 会话树/会话卡头像也换新（重建时取 avatarUrl）
   const wp = document.getElementById('wallpaper') as HTMLImageElement
   if (meta.wallpaper) {
     wp.src = `${base}/${meta.wallpaper}`
@@ -117,6 +151,8 @@ function isInteractiveTarget(target: EventTarget | null): boolean {
 }
 
 function showBubble(html: string, isError = false): void {
+  bubbleRow.classList.remove('hidden')
+  // 内层气泡自身也可能带着 HTML 初始的 hidden（重构气泡行时引入的双重 hidden）
   bubble.classList.remove('hidden')
   bubble.classList.toggle('error', isError)
   bubbleText.innerHTML = html
@@ -129,25 +165,114 @@ function showThinking(): void {
 
 function showUserToast(text: string): void {
   userToast.textContent = text
-  userToast.classList.remove('hidden', 'fade')
+  // 内层气泡自身也带着 HTML 初始的 hidden（与 #bubble 同款双重 hidden）
+  userToast.classList.remove('hidden')
+  toastRow.classList.remove('hidden', 'fade')
   if (userToastTimer) clearTimeout(userToastTimer)
   userToastTimer = setTimeout(() => {
-    userToast.classList.add('fade')
-    setTimeout(() => userToast.classList.add('hidden'), 700)
+    toastRow.classList.add('fade')
+    setTimeout(() => toastRow.classList.add('hidden'), 700)
   }, 3600)
 }
 
 // ---------- 事件接线 ----------
 
+// ---------- 主界面聊天窗：live 渲染（不出镜聊天时，她的回复在窗口里长出来） ----------
+
+let homeLiveMsg: HTMLDivElement | null = null // 她正在生成的气泡（三点 → 流式句子 → 定稿）
+let homeLiveText = ''
+
+/** 主聊天窗当前可见（home 视图 + 会话视图展开）才操作它的 DOM */
+function homeChatVisible(): boolean {
+  return currentView === 'home' && !sessionView.classList.contains('hidden')
+}
+
+function appendHomeRow(row: HTMLDivElement): void {
+  sessionPreview.querySelector('.empty-zzz')?.remove()
+  sessionPreview.appendChild(row)
+  sessionPreview.scrollTop = sessionPreview.scrollHeight
+}
+
+function removeHomeLive(): void {
+  homeLiveMsg = null
+  homeLiveText = ''
+  sessionPreview.querySelector('.h-row.live')?.remove()
+}
+
+/** 她开始想：聊天窗里放一个三点气泡（复用通话气泡的三点样式） */
+function showHomeThinking(): void {
+  if (!homeChatVisible()) return
+  removeHomeLive()
+  const row = document.createElement('div')
+  row.className = 'h-row assistant live'
+  const avatar = document.createElement('img')
+  avatar.className = 'avatar'
+  avatar.src = avatarUrl
+  avatar.draggable = false
+  const msg = document.createElement('div')
+  msg.className = 'h-msg assistant'
+  msg.innerHTML = '<span class="dots"><i></i><i></i><i></i></span>'
+  row.append(avatar, msg)
+  appendHomeRow(row)
+  homeLiveMsg = msg
+}
+
+/** 流式句子到达：整句追加进她的 live 气泡（逐字打字机是通话气泡专属） */
+function homeSentence(text: string): void {
+  if (!homeChatVisible() || !homeLiveMsg) return
+  homeLiveText += text
+  homeLiveMsg.textContent = homeLiveText
+  sessionPreview.scrollTop = sessionPreview.scrollHeight
+}
+
+/** 回复定稿：live 气泡原位定稿；没有 live（比如用户切过视图）就整行补一条。
+ *  isError=true 时红字显示（整轮失败的提示，不然"思考中"三点会一直挂着）。
+ *  注意：切到别的页/通话中时不能丢——之前这里直接 return，回来只看到卡住的三点，
+ *  看着就像她没回复。预览 DOM 属于当前会话，隐藏时照常写入，切回来就是完整对话。 */
+function finalizeHomeAssistant(content: string, ts: number, isError = false): void {
+  const clean = content.trim()
+  if (!homeLiveMsg || !homeChatVisible()) {
+    homeLiveMsg = null
+    removeHomeLive() // 切走期间挂在预览里的"思考中"行要清掉
+  }
+  if (!clean || !currentSession) return
+  if (!homeLiveMsg) {
+    const row = historyMessageNode({ role: 'assistant', content: clean, ts })
+    if (isError) row.querySelector('.h-msg')?.classList.add('error')
+    appendHomeRow(row)
+    return
+  }
+  homeLiveMsg.textContent = clean
+  if (isError) homeLiveMsg.classList.add('error')
+  const when = document.createElement('span')
+  when.className = 'when'
+  when.textContent = formatTime(ts)
+  homeLiveMsg.appendChild(when)
+  homeLiveMsg.closest('.h-row')?.classList.remove('live')
+  homeLiveMsg = null
+  homeLiveText = ''
+  sessionPreview.scrollTop = sessionPreview.scrollHeight
+}
+
+/** 用户消息：聊天窗右侧补一条蓝泡（pet:user-message 只对真实输入发，hidden 开场不发）。
+ *  不在私信页（通话中/切到邀约）也要补：聊天窗 DOM 属于当前会话，切回来要能对上完整一问一答 */
+function appendHomeUserRow(text: string): void {
+  if (!currentSession) return
+  appendHomeRow(historyMessageNode({ role: 'user', content: text, ts: Date.now() }))
+}
+
 api.on('pet:state', (state) => {
   if (state === 'thinking') {
     revealedText = ''
     showThinking()
+    showHomeThinking()
   }
 })
 
-api.on('pet:user-message', (text) => {
+api.on('pet:user-message', (text, sessionId) => {
   showUserToast(String(text))
+  // 带会话 id 时只在它是当前展示的会话才补行，防止串台
+  if (!sessionId || currentSession?.id === sessionId) appendHomeUserRow(String(text))
   renderHistoryIfOpen()
 })
 
@@ -167,6 +292,7 @@ api.on('pet:sentence', (sentence, durationMs) => {
   revealedText += text
   pendingChars += text.length
   startReveal(Number(durationMs) || 0)
+  homeSentence(text) // 主界面聊天窗：整句直出
 })
 
 function stopReveal(): void {
@@ -213,6 +339,8 @@ api.on('pet:llm-done', (payload) => {
     revealedText = text
   }
   showEmotion(emotion)
+  // 兜底：pet:message(assistant) 先到的话这里已经是空的；还挂着 live 就用已有字幕定稿
+  if (homeLiveMsg) finalizeHomeAssistant(text || homeLiveText, Date.now())
   renderHistoryIfOpen()
 })
 
@@ -221,6 +349,10 @@ api.on('pet:message', (payload) => {
   const { sessionId, message } = payload as { sessionId: string; message: ChatMessage }
   if (!currentSession || currentSession.id !== sessionId) return
   currentSession.messages.push(message)
+  // 主界面聊天窗：她的回复原位定稿（用户行已由 pet:user-message 渲染，这里只管 assistant）
+  if (message.role === 'assistant' && !message.hidden) {
+    finalizeHomeAssistant(message.content, message.ts)
+  }
   renderHistoryIfOpen()
 })
 
@@ -320,7 +452,7 @@ api.on('pet:tts-end', () => {
 api.on('pet:tts-error', (message) => {
   showBubble(escapeHtml(`（语音没播出来：${String(message)}）`), true)
   if (errorTimer) clearTimeout(errorTimer)
-  errorTimer = setTimeout(() => bubble.classList.add('hidden'), 6000)
+  errorTimer = setTimeout(() => bubbleRow.classList.add('hidden'), 6000)
 })
 
 api.on('pet:error', (message) => {
@@ -329,8 +461,10 @@ api.on('pet:error', (message) => {
     ? `先去设置里把 API Key 配好：${text}`
     : `这轮没连上：${text}`
   showBubble(escapeHtml(hint), true)
+  // 主界面聊天窗：把卡在"思考中"的 live 行换成红字提示（用户此刻看不见通话气泡）
+  finalizeHomeAssistant(hint, Date.now(), true)
   if (errorTimer) clearTimeout(errorTimer)
-  errorTimer = setTimeout(() => bubble.classList.add('hidden'), 10000)
+  errorTimer = setTimeout(() => bubbleRow.classList.add('hidden'), 10000)
 })
 
 api.on('pet:config-changed', () => {
@@ -363,10 +497,13 @@ api.on('pet:tablet-shown', () => {
   player.resumeAll()
 })
 
-/** 岛卡片「开始聊天」：聚焦输入框 */
+/** 岛卡片「开始聊天」：切到私信页并聚焦聊天输入框 */
 api.on('pet:island-focus-chat', () => {
   if (currentView === 'call') input.focus()
-  else topicInput.focus()
+  else {
+    switchTab('chat')
+    homeChatInput.focus()
+  }
 })
 
 function escapeHtml(text: string): string {
@@ -406,7 +543,6 @@ function setBatchMode(on: boolean): void {
   batchMode = on
   selectedSessions.clear()
   manageSessionsBtn.classList.toggle('hidden', on)
-  newSessionBtn.classList.toggle('hidden', on)
   batchBar.classList.toggle('hidden', !on)
   sessionList.classList.toggle('batch', on)
   void renderSessions()
@@ -438,28 +574,59 @@ batchDeleteBtn.addEventListener("click", () => {
   })
 })
 
+// 角色分组展开状态（智谱任务列表式：角色行下拉直接挂会话）
+let charGroupExpanded = true
+
+/** 组头只有一份静态 DOM：这里只同步展开态，列表重建不会带走 ＋/爱心的监听 */
+function syncGroupHead(): void {
+  groupChevron.textContent = charGroupExpanded ? '▾' : '▸'
+  charGroupHead.classList.toggle('collapsed', !charGroupExpanded)
+}
+
+charGroupHead.addEventListener('click', () => {
+  charGroupExpanded = !charGroupExpanded
+  syncGroupHead()
+  void renderSessions()
+})
+
 async function renderSessions(): Promise<void> {
   const store = await api.listSessions()
   sessionList.innerHTML = ''
+  syncGroupHead()
+  if (!charGroupExpanded) return
   if (store.sessions.length === 0) {
     const empty = document.createElement('div')
     empty.className = 'empty'
-    empty.textContent = '还没有会话\n定个话题，打给瞬光吧'
+    empty.textContent = '还没有会话\n点上面的 ＋ 开个新话题'
     sessionList.appendChild(empty)
     return
   }
+
+  // 单角色阶段所有会话都挂当前皮肤角色组下；后续给 session 加 characterId 即成真分组
   for (const session of store.sessions) {
     const item = document.createElement('div')
     item.className = 'session-item' + (session.id === currentSession?.id ? ' active' : '')
     item.dataset.sid = session.id
     if (batchMode && selectedSessions.has(session.id)) item.classList.add('batch-sel')
 
+    // 微信式会话行：标题 + 最后一句预览 + 时间（角色头像在组头上，行内不再重复）
+    const meta = document.createElement('div')
+    meta.className = 's-meta'
     const title = document.createElement('div')
     title.className = 't'
     title.textContent = session.title || '新的对话'
+    const lastVisible = [...session.messages].reverse().find((m: ChatMessage) => !m.hidden)
+    const preview = document.createElement('div')
+    preview.className = 'p'
+    preview.textContent = lastVisible
+      ? lastVisible.content.trim()
+      : session.topic
+        ? `话题：${session.topic}`
+        : '还没开始聊'
     const time = document.createElement('div')
     time.className = 'time'
     time.textContent = formatTime(session.updatedAt)
+    meta.append(title, preview, time)
     const del = document.createElement('button')
     del.className = 'del'
     del.type = 'button'
@@ -474,9 +641,9 @@ async function renderSessions(): Promise<void> {
         item.classList.toggle('batch-sel', selectedSessions.has(session.id))
         updateBatchBar()
       })
-      item.append(title, time)
+      item.append(meta)
     } else {
-      item.append(title, time, del)
+      item.append(meta, del)
       item.addEventListener('click', () => void selectSession(session.id))
       del.addEventListener('click', (event) => {
         event.stopPropagation()
@@ -499,7 +666,8 @@ async function selectSession(id: string): Promise<void> {
   await renderSessions()
 }
 
-let avatarUrl = 'petasset://assets/avatar-yeshunguang.png'
+let avatarUrl = 'petasset://skin/avatar.png'
+bubbleAvatar.src = avatarUrl // 默认头像兜底（applySkin 里会按皮肤刷新）
 const USER_AVATAR_SVG =
   '<svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.3 0-8 1.7-8 5v1a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-1c0-3.3-4.7-5-8-5z"/></svg>'
 
@@ -533,52 +701,164 @@ function historyMessageNode(message: ChatMessage): HTMLDivElement {
   return row
 }
 
+// ---------- 敲敲三选项卡：邀约 / 私信 / 群聊 ----------
+
+let currentTab: 'video' | 'chat' | 'group' = 'chat'
+
+/** 按 currentTab 整理主区视图的可见性（聊天窗在私信页常驻，空会话显示 ZZZ 空态） */
+function applyTabMain(): void {
+  inviteView.classList.toggle('hidden', currentTab !== 'video')
+  groupView.classList.toggle('hidden', currentTab !== 'group')
+  sessionView.classList.toggle('hidden', currentTab !== 'chat')
+  profilePanel.classList.add('hidden')
+  // 还没选会话时聊天窗也别留白：给 ZZZ 空态，用户知道往哪儿打字
+  if (currentTab === 'chat' && sessionPreview.childElementCount === 0) renderEmptyPreview()
+}
+
+function switchTab(tab: 'video' | 'chat' | 'group'): void {
+  currentTab = tab
+  tabVideo.classList.toggle('on', tab === 'video')
+  tabChat.classList.toggle('on', tab === 'chat')
+  tabGroup.classList.toggle('on', tab === 'group')
+  sideVideo.classList.toggle('hidden', tab !== 'video')
+  sideChat.classList.toggle('hidden', tab !== 'chat')
+  sideGroup.classList.toggle('hidden', tab !== 'group')
+  applyTabMain()
+  if (tab === 'video') void loadImpression()
+}
+
+/** 邀约卡：印象取自档案记忆的第一条（游戏里是「对某人的印象」） */
+async function loadImpression(): Promise<void> {
+  const name = skinMeta?.name || '叶瞬光'
+  impTitle.textContent = `对${name}的印象：`
+  try {
+    const profile = await api.getProfile()
+    impText.textContent = profile.facts[0]?.text || '聊得多了，这里就会写下对你的印象'
+  } catch {
+    // 拉不到就保持现状
+  }
+}
+
+// 邀约 = 发起视频通话（没会话就先按「随便聊聊」建档，她围绕话题接通）
+inviteBtn.addEventListener('click', () => {
+  void (async () => {
+    if (!currentSession) {
+      const session = await api.createSession('随便聊聊')
+      if (!session) return
+      currentSession = session
+      await renderSessions()
+    }
+    await startCall()
+  })()
+})
+
+// 喜欢的代理人：星标点亮 / 熄灭，状态存配置（设置页保存会原样保留）。
+// 这段在模块顶层——任何同步异常都会掐死后面所有接线（三个选项卡、boot 全体阵亡），
+// 旧 preload / 半热更新的页面里 api 可能根本没有这两个方法，全部兜底，绝不往外抛。
+function renderFavoriteAgent(lit: boolean): void {
+  if (!inviteStar) return
+  inviteStar.classList.toggle('lit', lit)
+  inviteStar.setAttribute('aria-pressed', String(lit))
+}
+
+function initFavoriteAgent(): void {
+  if (!inviteStar) return
+  inviteStar.addEventListener('click', () => {
+    const lit = !inviteStar.classList.contains('lit')
+    renderFavoriteAgent(lit)
+    void api.setFavoriteAgent?.(lit)
+  })
+  try {
+    void api
+      .getFavoriteAgent()
+      .then(renderFavoriteAgent)
+      .catch(() => renderFavoriteAgent(false))
+  } catch {
+    renderFavoriteAgent(false)
+  }
+}
+
+initFavoriteAgent()
+
+tabVideo.addEventListener('click', () => switchTab('video'))
+tabChat.addEventListener('click', () => switchTab('chat'))
+tabGroup.addEventListener('click', () => switchTab('group'))
+
 /** 选中已有会话：右侧直接展示这段对话的内容 */
 function showSessionView(session: ChatSession): void {
-  topicView.classList.add('hidden')
   profilePanel.classList.add('hidden')
-  sessionView.classList.remove('hidden')
+  applyTabMain()
   sessionTitleEl.textContent = session.title || '新的对话'
   sessionWhenEl.textContent = formatTime(session.updatedAt)
-  topicInput.value = session.topic
-  syncChips()
 
   sessionPreview.innerHTML = ''
+  removeHomeLive() // 重建列表：上一轮的 live 气泡节点已随 innerHTML 消失，指针同步作废
   const visible: ChatMessage[] = session.messages.filter((m: ChatMessage) => !m.hidden)
   if (visible.length === 0) {
-    const empty = document.createElement('div')
-    empty.className = 'empty'
-    empty.textContent = session.topic
-      ? `主题「${session.topic}」还没开始\n点下面打给她`
-      : '这次通话还没开始\n点下面打给她'
-    sessionPreview.appendChild(empty)
+    renderEmptyPreview()
     return
   }
   for (const message of visible) sessionPreview.appendChild(historyMessageNode(message))
   sessionPreview.scrollTop = sessionPreview.scrollHeight
 }
 
-/** 回到「新会话定主题」状态 */
+/** ZZZ-Chat 式空态：还没有消息 / 开始对话吧 */
+function renderEmptyPreview(): void {
+  sessionPreview.innerHTML = ''
+  const empty = document.createElement('div')
+  empty.className = 'empty-zzz'
+  empty.innerHTML =
+    '<div class="ez-t1">还没有消息。</div>' +
+    '<div class="ez-t2">开始对话吧！</div>' +
+    '<img class="ez-sticker" src="petasset://assets/icons/knock-knock.svg" alt="" draggable="false" />' +
+    '<div class="ez-hint">在下面打一句，她就接上了</div>'
+  sessionPreview.appendChild(empty)
+}
+
+/** 回到「空聊天窗」状态（下一条消息会现场建档） */
 function resetComposer(): void {
   currentSession = null
-  topicInput.value = ''
-  syncChips()
-  profilePanel.classList.add('hidden')
-  sessionView.classList.add('hidden')
-  topicView.classList.remove('hidden')
+  removeHomeLive()
+  switchTab('chat')
+  sessionTitleEl.textContent = ''
+  sessionWhenEl.textContent = ''
+  renderEmptyPreview()
 }
+
+/** ＋：开一个新话题并当场切过去——右侧换成空聊天窗，左侧新行亮一下 */
+async function startNewSession(): Promise<void> {
+  // 已经停在一条还没开口的会话上就直接复用，免得连点堆出一排空会话
+  const session =
+    currentSession && currentSession.messages.length === 0
+      ? currentSession
+      : await api.createSession('')
+  if (!session) return
+  currentSession = session
+  charGroupExpanded = true
+  switchTab('chat')
+  showSessionView(session)
+  await renderSessions()
+  const row = sessionList.querySelector<HTMLElement>(`.session-item[data-sid="${session.id}"]`)
+  if (row) {
+    row.classList.add('just-new')
+    setTimeout(() => row.classList.remove('just-new'), 900)
+  }
+  homeChatInput.value = ''
+  homeChatInput.focus()
+}
+
+newSessionBtn.addEventListener('click', (event) => {
+  event.stopPropagation() // 别顺带把角色组收起来
+  void startNewSession()
+})
+
+// 换形象入口在设置窗口（底部「设置」按钮）
 
 function syncChips(): void {
   for (const chip of document.querySelectorAll<HTMLButtonElement>('#topic-chips .chip')) {
     chip.classList.toggle('on', !!topicInput.value && chip.textContent === topicInput.value)
   }
 }
-
-newSessionBtn.addEventListener('click', () => {
-  resetComposer()
-  void renderSessions()
-  topicInput.focus()
-})
 
 for (const chip of document.querySelectorAll<HTMLButtonElement>('#topic-chips .chip')) {
   chip.addEventListener('click', () => {
@@ -621,25 +901,54 @@ async function startCall(): Promise<void> {
   input.focus()
 }
 
-document.getElementById('start-call-btn')?.addEventListener('click', () => {
+// 聊天窗里的视频通话按钮（原「继续视频通话」长按钮的继任者）
+homeCallBtn.addEventListener('click', () => {
   void startCall()
 })
 
-document.getElementById('resume-call-btn')?.addEventListener('click', () => {
+// 话题输入回车 = 直接邀约（带话题的视频通话，空会话时她围绕话题接通）
+topicInput.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter') return
+  event.preventDefault()
+  switchTab('video')
   void startCall()
+})
+
+/** 主界面聊天窗直接打字：发出去，她照常语音回复（runTurn 与视图无关） */
+async function sendFromHome(): Promise<void> {
+  const text = homeChatInput.value.trim()
+  if (!text) return
+  homeChatInput.value = ''
+  if (!currentSession) {
+    // 没建档就现场建一个（标题会自动取这条消息），进聊天窗再发
+    const session = await api.createSession('')
+    if (!session) return
+    currentSession = session
+    showSessionView(session)
+    await renderSessions()
+  }
+  await api.send(text)
+  homeChatInput.focus()
+}
+
+homeInputbar.addEventListener('submit', (event) => {
+  event.preventDefault()
+  void sendFromHome()
 })
 
 // ---------- 档案记忆面板：她长期记住的关于你 ----------
 
 async function refreshProfileCount(): Promise<void> {
   const profile = await api.getProfile()
-  profileCount.textContent = String(profile.facts.length)
+  profileCount.textContent = `${profile.facts.length} 条`
   profileCount.classList.toggle('hidden', profile.facts.length === 0)
+  profileBtn.classList.toggle('has-facts', profile.facts.length > 0)
 }
 
 async function openProfilePanel(): Promise<void> {
-  // 关掉另外两个视图，档案面板独占右侧
-  topicView.classList.add('hidden')
+  // 关掉其他视图，档案面板独占右侧
+  inviteView.classList.add('hidden')
+  groupView.classList.add('hidden')
   sessionView.classList.add('hidden')
   profilePanel.classList.remove('hidden')
 
@@ -678,14 +987,13 @@ async function openProfilePanel(): Promise<void> {
   }
 }
 
-profileBtn.addEventListener('click', () => void openProfilePanel())
+profileBtn.addEventListener('click', (event) => {
+  event.stopPropagation() // 爱心在组头里：别顺带把角色组收起来
+  void openProfilePanel()
+})
 profileClose.addEventListener('click', () => {
   profilePanel.classList.add('hidden')
-  if (currentSession) showSessionView(currentSession)
-  else {
-    topicView.classList.remove('hidden')
-    sessionView.classList.add('hidden')
-  }
+  applyTabMain()
 })
 
 // ---------- 视图切换 / 挂断 ----------
@@ -699,7 +1007,9 @@ function showView(view: 'home' | 'call'): void {
     historyPanel.classList.remove('open')
     void renderSessions()
     void refreshProfileCount()
-    topicInput.focus()
+    applyTabMain() // 回 home 恢复当前选项卡的主区视图
+    if (currentTab === 'chat') homeChatInput.focus()
+    else if (currentTab === 'video') topicInput.focus()
   }
 }
 

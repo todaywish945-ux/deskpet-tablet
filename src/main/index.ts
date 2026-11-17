@@ -11,6 +11,13 @@ import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
 import { assetRoot, activeSkinDir, loadConfig } from './services/store'
 import { warmUpGsv } from './services/gsv'
 
+// 产品名已改为「敲敲」：数据目录沿用旧名，历史配置/会话/记忆（含 API Key）原地保留，
+// 绝不能因为改名搬到新目录——一搬就等于用户数据全丢。
+// --user-data-dir 显式指定时以它为准（仅开发/验证使用），正式启动才钉到旧目录。
+if (!process.argv.some((arg) => arg.startsWith('--user-data-dir'))) {
+  app.setPath('userData', join(app.getPath('appData'), 'ye-shunguang-deskpet'))
+}
+
 // 自定义资源协议：渲染层通过 petasset://assets/... 访问 assets 目录（视频/图片/清单）
 protocol.registerSchemesAsPrivileged([
   {
@@ -24,6 +31,7 @@ const MIME: Record<string, string> = {
   '.webp': 'image/webp',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
   '.webm': 'video/webm',
   '.mp4': 'video/mp4',
   '.mp3': 'audio/mpeg',
@@ -56,7 +64,11 @@ function serveAsset(url: string, request: Request): Response {
   if (!existsSync(full) || !statSync(full).isFile()) {
     return new Response('not found', { status: 404 })
   }
-  const type = MIME[join(full).split('.').pop()!.toLowerCase()] ?? 'application/octet-stream'
+  // ⚠ MIME 键带前导点：split('.').pop() 给的是无点扩展名（'svg'），要补 '.' 再查。
+  //   旧写法永远查不到、全部落 octet-stream——位图/视频/字体靠 Chromium 内容嗅探侥幸能用，
+  //   唯独 <img> 里的 SVG 必须正确的 image/svg+xml 才渲染（敲敲图标裂图即此因）
+  const ext = '.' + (join(full).split('.').pop() ?? '').toLowerCase()
+  const type = MIME[ext] ?? 'application/octet-stream'
   const data = new Uint8Array(readFileSync(full))
   const range = request.headers.get('range')
   if (range) {

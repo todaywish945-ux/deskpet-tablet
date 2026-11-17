@@ -2,12 +2,12 @@
 <html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
-    <title>平板桌宠 · 设置</title>
+    <title>敲敲 · 设置</title>
     <link rel="stylesheet" href="./style.css" />
   </head>
   <body>
     <main id="app">
-      <h1>平板桌宠 · 设置</h1>
+      <h1>敲敲 · 设置</h1>
 
       <section>
         <h2>角色皮肤</h2>
@@ -54,6 +54,10 @@
           <span>通话中她说话时你开口，她自动停下听</span>
           <input id="call-bargein" type="checkbox" />
         </label>
+        <label class="row">
+          <span>久坐提醒（连续用电脑 45 分钟，提醒喝水 / 起来活动）</span>
+          <input id="pro-health" type="checkbox" />
+        </label>
       </section>
 
       <section>
@@ -69,6 +73,19 @@
         <label>
           <span>模型</span>
           <input id="llm-model" type="text" placeholder="glm-5.3-flash" />
+        </label>
+        <p class="hint">备用接口（可选，跨厂商兜底）：主模型 20 秒没出字时换它回一句，下一轮仍用上面的主模型；三项都填了才生效。</p>
+        <label>
+          <span>备用 Base URL</span>
+          <input id="llm-backup-base" type="text" placeholder="https://ark.cn-beijing.volces.com/api/v3" />
+        </label>
+        <label>
+          <span>备用 API Key</span>
+          <input id="llm-backup-key" type="password" placeholder="火山方舟：ARK_API_KEY" />
+        </label>
+        <label>
+          <span>备用模型</span>
+          <input id="llm-backup-model" type="text" placeholder="doubao-seed-2-1-lite-260915" />
         </label>
       </section>
 
@@ -108,7 +125,7 @@
             <button id="test-btn" type="button">② 试听</button>
           </div>
           <p class="hint">
-            注册会用 assets/voice/reference.mp3 里的参考音频在你自己的百炼账号里创建音色，
+            注册会用项目内置的叶瞬光参考音频（assets/voice/reference.mp3）在你自己的百炼账号里创建音色，
             一次性操作；换语音模型后需要重新注册。
           </p>
         </div>
@@ -125,7 +142,7 @@
           <label>
             <span>参考音频（3~10 秒清晰人声）</span>
             <div class="row file-row">
-              <input id="gsv-ref-audio" type="text" placeholder="参考音频路径（3~10 秒清晰人声）" readonly />
+              <input id="gsv-ref-audio" type="text" placeholder="选择一段叶瞬光的原声" readonly />
               <button id="gsv-pick-btn" type="button">浏览…</button>
             </div>
           </label>
@@ -134,8 +151,8 @@
             <textarea id="gsv-ref-text" rows="3" placeholder="与参考音频说的一字不差，例如：…"></textarea>
           </label>
           <p class="hint">
-            先双击 GPT-SoVITS 整合包中的启动脚本启动本地服务（首次启动要加载模型，等
-            控制台出现服务地址再试）。参考音频越贴近目标音色，克隆效果越好。
+            先双击 GPT-SoVITS 整合包里的 <code>叶瞬光-语音.bat</code> 启动本地服务（首次启动要加载模型，等
+            控制台出现服务地址再试）。参考音频越贴近叶瞬光本人音色，克隆效果越好。
           </p>
         </div>
 

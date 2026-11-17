@@ -76,6 +76,9 @@ contextBridge.exposeInMainWorld('petAPI', {
   /** 档案记忆：她长期记住的关于用户的事实 */
   getProfile: () => ipcRenderer.invoke('profile:get'),
   deleteProfileFact: (factId: string) => ipcRenderer.invoke('profile:delete-fact', factId),
+  /** 喜欢的代理人：邀约卡星标状态（点亮=喜欢） */
+  getFavoriteAgent: () => ipcRenderer.invoke('char:favorite-get'),
+  setFavoriteAgent: (favorite: boolean) => ipcRenderer.invoke('char:favorite-set', favorite),
   on: (channel: (typeof PET_EVENTS)[number], callback: (...args: unknown[]) => void) => {
     if (!(PET_EVENTS as readonly string[]).includes(channel)) return
     const listener = (_event: unknown, ...args: unknown[]): void => callback(...args)

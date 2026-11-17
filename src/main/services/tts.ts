@@ -30,7 +30,7 @@ function assertReady(config: TTSConfig): void {
     return
   }
   if (!config.apiKey) throw new TTSError('还没有配置百炼 API Key，先到设置里填一下。')
-  if (!config.voice) throw new TTSError('还没有克隆音色，先到设置里注册桌宠的音色。')
+  if (!config.voice) throw new TTSError('还没有克隆音色，先到设置里注册叶瞬光的音色。')
   if (!config.model) throw new TTSError('语音模型未配置。')
 }
 

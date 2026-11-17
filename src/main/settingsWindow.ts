@@ -11,7 +11,7 @@ export function createSettingsWindow(): BrowserWindow {
   settingsWindow = new BrowserWindow({
     width: 560,
     height: 680,
-    title: '平板桌宠 · 设置',
+    title: '敲敲 · 设置',
     autoHideMenuBar: true,
     resizable: true,
     webPreferences: {

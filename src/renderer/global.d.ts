@@ -41,6 +41,9 @@ declare global {
       beginCall: () => Promise<boolean>
       getProfile: () => Promise<UserProfile>
       deleteProfileFact: (factId: string) => Promise<UserProfile>
+      /** 喜欢的代理人：邀约卡星标状态（点亮=喜欢） */
+      getFavoriteAgent: () => Promise<boolean>
+      setFavoriteAgent: (favorite: boolean) => Promise<boolean>
       on: (channel: string, callback: (...args: unknown[]) => void) => void
     }
     settingsAPI: {

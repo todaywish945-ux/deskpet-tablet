@@ -1,6 +1,6 @@
 /**
  * 灵动岛窗口：独立于平板的小窗，胶囊 ⇄ 展开卡片 ⇄ 贴边细条三种形态。
- * 参考常见灵动岛交互实现：
+ * 设计抄自 D:\大肥鱼陪玩\桌宠（PySide6 版灵动岛）：
  * - 无边框透明、置顶、绝不抢焦点（focusable:false = WS_EX_NOACTIVATE）
  * - 胶囊高 44 全圆角、展开卡片在胶囊正下方（几何一步到位，内容动画在渲染层 180ms）
  * - 拖到屏幕边缘 40px 内自动停靠成 16px 细条；鼠标靠近滑出、离开 800ms 收回（死区复检防振荡）
@@ -31,6 +31,10 @@ export type DockEdge = 'top' | 'bottom' | 'left' | 'right'
 let win: BrowserWindow | null = null
 let mode: IslandMode = 'capsule'
 let dockEdge: DockEdge | null = null
+/** 首帧是否已经画过：透明窗在页面还没渲染前亮出来，会先显示成一块黑矩形，
+ *  等首帧画好再显示（或把显示请求挂起，画好立刻补上） */
+let pagePainted = false
+let pendingShow = false
 
 export function getIslandWindow(): BrowserWindow | null {
   return win
@@ -78,6 +82,8 @@ function writePos(): void {
 
 export function createIslandWindow(): BrowserWindow {
   if (win) return win
+  pagePainted = false
+  pendingShow = false
   const pos = loadState()
   dockEdge = pos.dock
   win = new BrowserWindow({
@@ -92,7 +98,7 @@ export function createIslandWindow(): BrowserWindow {
     hasShadow: false,
     backgroundColor: '#00000000',
     skipTaskbar: true,
-    // 先前实现同款：WindowDoesNotAcceptFocus —— 点击岛绝不把焦点从当前应用抢走
+    // 大肥鱼同款：WindowDoesNotAcceptFocus —— 点击岛绝不把焦点从当前应用抢走
     focusable: false,
     show: false,
     webPreferences: {
@@ -104,6 +110,27 @@ export function createIslandWindow(): BrowserWindow {
     }
   })
   win.setAlwaysOnTop(true, 'screen-saver')
+  // 首帧画好之前不亮窗口：页面还没渲染时显示出来会是一块黑矩形（启动/重启瞬间常见）
+  const markPainted = (): void => {
+    pagePainted = true
+    if (pendingShow && win && !win.isDestroyed()) {
+      pendingShow = false
+      win.showInactive()
+    }
+  }
+  win.once('ready-to-show', markPainted)
+  win.webContents.on('did-finish-load', markPainted)
+  // 岛页面必须始终 100%：卡片窗口尺寸按 CSS 像素硬编码，页面一旦被放大，卡片底边就会
+  // 整块被窗口切掉（按钮只剩上半截）。加载完成把缩放钉回 1，也兜住历史 profile 里落下的
+  // 按 origin 持久缩放；滚轮缩放即时复位（配合独立 origin，见下方加载处）。
+  const forceZoomOne = (): void => {
+    if (!win || win.isDestroyed()) return
+    if (win.webContents.getZoomFactor() !== 1) win.webContents.setZoomFactor(1)
+  }
+  void win.webContents.setVisualZoomLevelLimits(1, 1)
+  win.webContents.on('dom-ready', forceZoomOne)
+  win.webContents.on('did-finish-load', forceZoomOne)
+  win.webContents.on('zoom-changed', forceZoomOne)
   // 页面（重）加载完成即重发当前状态：渲染层刷新/崩溃恢复后立刻知道自己在哪、停在哪条边。
   // 有停靠边时只发 dock 事件——mode=capsule 会让渲染层摘掉刚挂上的 docked 类
   win.webContents.on('did-finish-load', () => {
@@ -115,7 +142,10 @@ export function createIslandWindow(): BrowserWindow {
     }
   })
   if (process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/island/index.html`)
+    // http 源的 per-host 缩放表在窗口间共享：dev 下平板设在 localhost 的 1.1465 适配缩放
+    // 会把同源的岛一起放大。岛改走 127.0.0.1，两个 host 各管各的缩放。
+    const devBase = process.env['ELECTRON_RENDERER_URL'].replace('://localhost', '://127.0.0.1')
+    void win.loadURL(`${devBase}/island/index.html`)
   } else {
     void win.loadFile(join(__dirname, '../renderer/island/index.html'))
   }
@@ -139,7 +169,7 @@ function clampPos(): { x: number; y: number } {
   return clampCapsulePos(x, y)
 }
 
-// ---------- 几何补间（先前实现 _animate_to：180ms ease-out-cubic，16ms 步进） ----------
+// ---------- 几何补间（大肥鱼 _animate_to：180ms ease-out-cubic，16ms 步进） ----------
 let animTimer: ReturnType<typeof setInterval> | null = null
 
 function stopAnim(): void {
@@ -233,6 +263,16 @@ function peekRect(edge: DockEdge): Electron.Rectangle {
   }
 }
 
+/** 首帧画好后再显示窗口；没画好先记下，画好立刻补显示（避免启动/重启瞬间的黑块） */
+function showIslandSoon(): void {
+  if (!win || win.isDestroyed()) return
+  if (pagePainted) {
+    if (!win.isVisible()) win.showInactive()
+    return
+  }
+  pendingShow = true
+}
+
 function dockTo(edge: DockEdge): void {
   if (!win || win.isDestroyed()) return
   cancelRetreat()
@@ -243,7 +283,7 @@ function dockTo(edge: DockEdge): void {
   win.setBounds(stripRect(edge))
   setDockPassthrough(true) // 停靠时点击全穿透：绝不挡下层应用（浏览器标签等）
   win.webContents.send('pet:island-dock', edge)
-  if (!win.isVisible()) win.showInactive()
+  showIslandSoon()
   writePos()
 }
 
@@ -356,7 +396,7 @@ export function showCapsule(): void {
   const pos = clampPos()
   win.setBounds({ ...pos, width: CAPSULE_W + INSET * 2, height: CAPSULE_H + INSET * 2 })
   win.webContents.send('pet:island-mode', 'capsule')
-  if (!win.isVisible()) win.showInactive()
+  showIslandSoon()
 }
 
 /** 展开卡片：窗口先放大（多余区域透明），内容动画由渲染层播 */
@@ -376,7 +416,7 @@ export function expandCard(): void {
   )
   win.setBounds({ x: nx, y, width: CARD_W + INSET * 2, height: CARD_H + INSET * 2 })
   win.webContents.send('pet:island-mode', 'card')
-  if (!win.isVisible()) win.showInactive()
+  showIslandSoon()
 }
 
 /** 渲染层卡片收起动画播完后调用：有停靠边回细条，否则缩回胶囊 */
@@ -396,6 +436,7 @@ export function collapseToCapsule(): void {
 
 export function hideIsland(): void {
   clearPeekWatchdog()
+  pendingShow = false
   mode = dockEdge ? 'docked' : 'capsule'
   win?.hide()
 }
@@ -446,7 +487,7 @@ export function stopIslandDrag(): void {
   if (!dragTimer) return // 没在拖：什么都不做
   cancelDragTimer()
   if (!win || win.isDestroyed()) return
-  // 先前实现规则：松手按光标位置判停靠——距任一边 40px 内直接停靠成细条
+  // 大肥鱼规则：松手按光标位置判停靠——距任一边 40px 内直接停靠成细条
   const cursor = screen.getCursorScreenPoint()
   const display = screen.getDisplayMatching({ x: cursor.x, y: cursor.y, width: 1, height: 1 })
   const wa = display.workArea

@@ -63,7 +63,7 @@ const EXTRACT_SYSTEM = `你是一个记忆管理器。任务：根据「已有�
 
 规则：
 1. 只记关于用户本人的、有长期价值的信息：身份/生活状态、喜好厌恶、人际关系、正在经历的事、身心状态、对陪伴方式的偏好、重要的约定。
-2. 不记：闲聊寒暄、一次性内容（"帮我讲个故事"）、桌宠说过的话、对话细节。
+2. 不记：闲聊寒暄、一次性内容（"帮我讲个故事"）、叶瞬光说过的话、对话细节。
 3. 输出一个 JSON 数组，每个元素：
    {"action":"add","text":"..."} 新增一条（30字内，第三人称，称对方为"用户"）
    {"action":"update","id":"旧条目id","text":"..."} 更新旧条目（信息变化时，text 给最新表述）
@@ -170,7 +170,7 @@ export function dialogueForExtraction(
   const picked: string[] = []
   let total = 0
   for (const m of [...messages].reverse()) {
-    const line = `${m.role === 'user' ? '用户' : '桌宠'}：${m.content}`
+    const line = `${m.role === 'user' ? '用户' : '瞬光'}：${m.content}`
     if (total + line.length > maxChars) break
     picked.unshift(line)
     total += line.length
