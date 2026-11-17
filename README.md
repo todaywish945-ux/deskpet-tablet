@@ -57,7 +57,7 @@ npm run dist       # 打包 Windows 安装包（NSIS → dist_app/）
 
 | 选项 | 优点 | 缺点 | 免费情况 | Base URL | 模型示例 |
 |---|---|---|---|---|---|
-| 智谱 GLM（默认推荐） | 长期免费、中文口语好、注册最简单 | 高峰排队、模型版本会轮换 | Flash 系列长期免费 | `https://open.bigmodel.cn/api/paas/v4` | `glm-4.5-flash`（下线则 `glm-4.7-flash` / `glm-4-flash`） |
+| 智谱 GLM（默认推荐） | 目前免费、中文口语好、注册最简单 | 高峰排队、模型版本会轮换 | 目前有免费 Flash 档 | `https://open.bigmodel.cn/api/paas/v4` | `glm-4.5-flash`（下线则 `glm-4.7-flash` / `glm-4-flash`） |
 | 火山引擎豆包 | 额度大方、单价便宜、口语自然 | 开通步骤最多、「每天免费」需数据授权 | 开通送免费额度 | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-2-1-lite-260915` |
 | 硅基流动 | 一个 Key 多家模型、注册快、国内直连 | 免费只有小模型、语气平淡 | 免费开源小模型多 | `https://api.siliconflow.cn/v1` | `Qwen/Qwen3-8B` 等 |
 | 阿里云百炼 | 中文质量好、额度大、云服务稳定 | 额度有有效期、控制台步骤较多 | 新用户每模型约 100 万 tokens | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-flash` |
