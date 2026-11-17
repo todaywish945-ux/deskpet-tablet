@@ -226,7 +226,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
         "gsvLauncherPath": "<整合包目录里的启动脚本路径>"
         其他字段一个不动，改完读回给我确认；
      c. 框架会在她说第一句话时自动拉起本地服务，首次加载模型 1~2 分钟属正常。
-验收：ZHIPU_API_KEY 用户环境变量读回有值；
+验收：data\config.json 的 llm 三项齐全非空（默认路线还要求 ZHIPU_API_KEY 读回有值）；
       bailian →（做了注册）脚本无 FAIL；gptsovits → config.json 的 tts 段与上面一致。
 注意：注册脚本只更新语音相关配置字段，是合并写入，不许"修复"它。
 
