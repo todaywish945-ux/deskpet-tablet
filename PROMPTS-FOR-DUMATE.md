@@ -70,13 +70,15 @@
 
 ---
 
-## 卡2 · 填智谱 API Key（对话 + 语音输入共用）
+## 卡2 · 选对话模型 + 填 Key（默认智谱免费档）
 
+> 默认就走**智谱免费档**，不用纠结厂商：模型填 `glm-4.5-flash`（控制台提示下线就换 `glm-4.7-flash`，再不行 `glm-4-flash`）。
+> 想用豆包（火山引擎）的看本卡方式 C，按 [附录E](#附录e--火山引擎豆包开通教程ai-转述版) 一步一步开通。
 > 推荐环境变量方式：写在环境变量里不怕被任何脚本或重装影响；框架检测到配置里没有 Key 时会自动读它。
 
-**📋 给搭子的指令（复制，二选一）**
+**📋 给搭子的指令（复制，三选一）**
 
-方式 A（推荐，环境变量）：
+方式 A（默认，环境变量）：
 
 ```text
 在用户环境变量里设置 ZHIPU_API_KEY，值为 <我的智谱 API Key>（bigmodel.cn 申请）：
@@ -88,11 +90,24 @@ setx ZHIPU_API_KEY "<Key>"
 
 ```text
 打开 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json，
-只把 llm.apiKey 字段改成 <我的智谱 API Key>，其他任何字段都不许动。
-改完把文件读一遍给我确认（Key 打码）。
+把 llm.baseUrl 设为 https://open.bigmodel.cn/api/paas/v4，
+llm.model 设为 glm-4.5-flash（控制台没有就 glm-4.7-flash，再不行 glm-4-flash），
+llm.apiKey 设为 <我的智谱 API Key>；其他任何字段都不许动。
+改完把 llm 段读一遍给我确认（Key 打码）。
 ```
 
-**✅ 成功标准**：变量读回有值，或 config.json 中 `llm.apiKey` 非空。
+方式 C（豆包 / 火山引擎）：
+
+```text
+我想用豆包（火山引擎）当对话模型。请按《附录E · 火山引擎（豆包）开通教程》
+一步一步带我开通（每步等我确认，不要一次发全部步骤；Key 不许打进汇报），
+拿到 Key 后写进 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json：
+llm.baseUrl = https://ark.cn-beijing.volces.com/api/v3，
+llm.model = doubao-seed-2-1-lite-260915（以控制台「开通管理」页显示的模型 ID 为准），
+llm.apiKey = 我的豆包 Key。其他字段不动，改完读回确认（Key 打码）。
+```
+
+**✅ 成功标准**：变量读回有值，或 config.json 的 `llm` 三项（baseUrl/model/apiKey）齐全非空；发一条消息她有回复。
 
 **⚠️ 失败时补一句**：「如果 config.json 不存在，说明应用还没启动过。先执行一次卡4 的启动指令让它生成默认配置，再回来改。」
 
@@ -216,7 +231,8 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 
 **常见现象 → 先查什么**（贴给搭子能加快定位）：
 - 没声音 → config.json 的 `tts.voice` 是否为空（回卡1）；`tts.provider` 与实际引擎是否一致
-- 打字没回复 → `llm.apiKey` 是否为空（卡2）
+- 打字没回复 → `llm.apiKey` / `llm.model` / `llm.baseUrl` 三项是否都配置了（卡2）
+- 回复很慢或偶尔不回 → 免费档高峰排队，等十几秒或再发一次即可；想更稳就换豆包（卡2 方式 C）
 - 语音输入没反应 → 智谱 Key（ASR 与对话共用同一个 Key）
 - 窗口不见了 → 托盘图标右键退出重开；日志里找窗口创建报错
 
@@ -232,7 +248,8 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 第2步 音色注册：我的参考音频在 <路径>，百炼 Key 是 <Key>。
       把它覆盖为 assets\voice\reference.mp3，setx DASHSCOPE_API_KEY 后
       运行 node scripts/enroll-and-test.mjs，最后告诉我试听.wav 在哪。
-第3步 填智谱 Key：setx ZHIPU_API_KEY "<Key>"。
+第3步 对话模型：默认智谱免费档（setx ZHIPU_API_KEY "<Key>"，模型 glm-4.5-flash）；
+      想用豆包就按附录E 一步一步带我开通，再把 llm 三项改成豆包的值。
 第4步 皮肤确认：内置叶瞬光皮肤在 assets\skins\yeshunguang（开箱即用），确认其
       skin.json 存在并把 config.json 的 character.skin 设为 yeshunguang
       （我给了自己的素材则按 ASSET-GUIDE 放进 template 并切到 template）。
@@ -240,6 +257,42 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 
 完成后给我一份清单：每步的结果 + 当前 config.json 的 tts/llm/character 三段内容（Key 打码）。
 ```
+
+---
+
+## 附录E · 火山引擎（豆包）开通教程（AI 转述版）
+
+> 观众选了豆包时，按下面步骤**一步一步**带他操作：每步只发一条，等他回“好了/下一步”再继续；
+> 他明确说“全部发我”才一次性给全。界面改版时按名称找入口，找不到就让他截图给你。
+> Key 只写入本机配置文件，不许出现在任何汇报和日志里。
+
+【步骤 1 · 注册】打开 https://www.volcengine.com ，点右上角「注册」，手机号注册并登录。
+
+【步骤 2 · 实名认证】点右上角头像 →「实名认证」→ 个人认证，按提示填身份证 + 人脸/支付宝验证。
+没实名的账号开不了模型。
+
+【步骤 3 · 进入火山方舟】控制台顶部搜索「火山方舟」进入（或直接开 https://console.volcengine.com/ark ）。
+页面右上角地域必须选「华北 2（北京）/ cn-beijing」——OpenAI 兼容接口只支持这个地域。
+
+【步骤 4 · 开通模型（开通免费，调用才计费）】左侧菜单「开通管理」（个别版本在「模型广场」里）。
+找到 doubao-seed-2-1-lite，点「开通」；有「全选」「自动开通新模型」就一起勾上。
+新账号每个模型送约 50 万 tokens 一次性免费额度，额度内不扣钱。
+
+【步骤 5 · 创建 API Key】左侧菜单「API Key 管理」→「创建 API Key」→ 让他复制保存（通常只显示一次）。
+
+【步骤 6 · 验证它能回话】左侧「在线推理」→ 选 doubao-seed-2-1-lite → 在网页里发「你好」。
+能回复 = 开通成功、Key 有效；报 ModelNotOpen = 第 4 步没生效（查地域/有没有勾选该模型）。
+
+【步骤 7 · 写进应用配置】让他把 Key 贴给你（只写入本机配置文件，不会发给任何第三方），编辑
+config.json 的 llm 三项：baseUrl = https://ark.cn-beijing.volces.com/api/v3，
+model = doubao-seed-2-1-lite-260915（以开通管理页显示的模型 ID 为准），apiKey = 他刚复制的 Key。
+其他字段不动，改完读回确认（Key 打码）。
+
+【常见错误】401 = Key 复制不全或建错，重来；404 ModelNotOpen = 模型没开通/地域不是北京；
+404 model does not exist = 模型 ID 写错，照开通管理页抄；找不到「开通管理」就用控制台顶部搜索。
+
+【计费说明】开通和创建 Key 都免费；只有调用才按量计费，lite 档很便宜，聊天陪伴每月几块钱以内。
+「每天免费 200 万 tokens」属于需要数据授权的协作奖励计划，不是无条件赠送，别向观众乱承诺。
 
 ---
 

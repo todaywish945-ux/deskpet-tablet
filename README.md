@@ -36,7 +36,7 @@
 
 **方式一 · 安装包直装（最省事，无需 Node）**：到 [Releases](../../releases) 下载
 `yeshunguang-deskpet-setup-0.1.0.exe`（约 362MB，内置完整叶瞬光皮肤）双击安装 → 启动后右键平板边框
-或托盘图标打开**设置** → 填 API Key → 想要声音就在设置里点「注册音色」（参考音频已内置）→ 回到平板开聊。
+或托盘图标打开**设置** → 填 API Key 和模型（模型填 `glm-4.5-flash`，免费档）→ 想要声音就在设置里点「注册音色」（参考音频已内置）→ 回到平板开聊。
 
 **方式二 · 源码运行**（想魔改或用百度搭子全自动装，见 [AUTOSETUP.md](AUTOSETUP.md)）：
 
@@ -48,10 +48,17 @@ npm run dist       # 打包 Windows 安装包（NSIS → dist_app/）
 
 首次使用：
 
-1. **对话**：设置里填智谱 API Key（或 `setx ZHIPU_API_KEY`，框架自动读取）
+1. **对话**：设置里填智谱 API Key 和模型（`glm-4.5-flash`，免费档；控制台提示下线就换 `glm-4.7-flash`，再不行 `glm-4-flash`），或 `setx ZHIPU_API_KEY`，框架自动读取
 2. **声音**：参考音频放 `assets/voice/reference.mp3` → `setx DASHSCOPE_API_KEY` → `node scripts/enroll-and-test.mjs`（一次性，自动写入配置）
 3. **形象与人设**：复制 `assets/skins/template` 为你的皮肤，填入人设与素材，设置里选择
 4. 回到平板，开始聊天
+
+**对话模型怎么选（不用纠结厂商）**：
+
+- **默认、推荐**：智谱开放平台（bigmodel.cn）的免费 Flash 档，注册即用、无需绑卡；模型填 `glm-4.5-flash`（控制台提示下线就换 `glm-4.7-flash`，再不行 `glm-4-flash`）。
+- **想换豆包（火山引擎方舟）**：开通步骤见 [AUTOSETUP.md](AUTOSETUP.md) 文末《附录 · 火山引擎（豆包）开通教程》，模型填 `doubao-seed-2-1-lite-260915`（以控制台开通管理页为准）。
+- **其他任何 OpenAI 兼容接口**都可以：设置里换成对应的 Base URL / API Key / 模型即可。
+- 免费档高峰期偶尔排队属正常，稍等或再发一次即可。
 
 不想动手？把 [AUTOSETUP.md](AUTOSETUP.md) 里的总控指令整段发给会操作电脑的
 AI 智能体（例如百度搭子桌面端）：它自己下载框架、装环境、配密钥、启动验收——
