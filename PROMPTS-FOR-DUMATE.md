@@ -108,7 +108,7 @@
 如果我只给了 Key 没写厂商：先问我这是哪家的 Key（ark- 开头 = 火山引擎豆包；
 分不清就问我是在哪个网站注册的），不要默认按智谱处理。
 每步只发一条，等我确认再继续；Key 不许出现在任何汇报里。
-拿到 Key 后，把 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 llm 三项
+拿到 Key 后，把 C:\Users\<你>\AppData\Roaming\ye-shunguang-deskpet\data\config.json 的 llm 三项
 （baseUrl / model / apiKey）写成对应教程里的值，其他字段不动，改完读回确认（Key 打码）。
 敲敲版设置里有「备用接口」：如果我要配跨厂商兜底，就把第二家填进 config.json 的
 llm.backup 三项（baseUrl / model / apiKey，不许复用主模型 Key）；设置里找不到这项就说明是旧版，
@@ -168,7 +168,7 @@ b) manifest.json（如果有）引用的每个视频文件都存在；c) 设置�
 2. 系统托盘出现了应用图标；
 3. 在平板里发一条「你好」等她回复，确认打字机能出字；
 4. 右键平板边框 → 设置 能打开设置窗口，皮肤下拉里能看到我的皮肤。
-如果启动失败或窗口没出现，读 %APPDATA%\deskpet-tablet\logs\ 下最新的
+如果启动失败或窗口没出现，读 %APPDATA%\ye-shunguang-deskpet\logs\ 下最新的
 日志文件，定位原因后最小化修复并重启验证。
 ```
 
@@ -201,7 +201,7 @@ b) manifest.json（如果有）引用的每个视频文件都存在；c) 设置�
 ```text
 我想把语音从百炼在线合成切换到本地 GPT-SoVITS。GPT-SoVITS 整合包已解压在
 <GPT-SoVITS整合包目录>（必须是纯英文路径）。请修改
-C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
+C:\Users\<你>\AppData\Roaming\ye-shunguang-deskpet\data\config.json 的 tts 段：
   "enabled": true,
   "provider": "gptsovits",
   "gsvApiBase": "http://127.0.0.1:9880",
@@ -217,7 +217,7 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 
 **⚠️ 失败时补一句**：
 - 没声音 → 「先手动用整合包的 runtime\python.exe api_v2.py 起服务，看到 Uvicorn running 后再让她说话；应用检测到服务在线就不会重复拉起。」
-- 仍然没声音 → 「读 %APPDATA%\deskpet-tablet\logs\gsv-autostart.log 贴给我。检查整合包路径里不能有中文。」
+- 仍然没声音 → 「读 %APPDATA%\ye-shunguang-deskpet\logs\gsv-autostart.log 贴给我。检查整合包路径里不能有中文。」
 
 > 模型训练本身在整合包自带的 WebUI 里做（数据集处理→微调），框架只负责调用 api_v2。
 
@@ -231,7 +231,7 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 桌宠出问题了。现象：<一句话描述，例如"她不说话了"/"没有声音"/"启动后窗口一闪就没了">。
 
 请你按这个流程处理：
-1. 读 %APPDATA%\deskpet-tablet\logs\ 下最新的日志文件最近 50 行；
+1. 读 %APPDATA%\ye-shunguang-deskpet\logs\ 下最新的日志文件最近 50 行；
 2. 从日志定位直接原因，向我复述你的判断；
 3. 提出最小化修复方案，等我回复"可以"后再动手；
 4. 修复后按卡4 的四项标准重新验收并汇报。
@@ -381,7 +381,7 @@ model = doubao-seed-2-1-lite-260915（以开通管理页显示的模型 ID 为�
 | `avatar` / `wallpaper` / `tray` | 头像 / 壁纸 / 托盘图（后两个可选） |
 | `persona` | **人设（系统提示词全文）** |
 
-- 内置皮肤在 `assets\skins\`；**用户自装皮肤放 `%APPDATA%\deskpet-tablet\skins\<id>\`，优先级更高**。
+- 内置皮肤在 `assets\skins\`；**用户自装皮肤放 `%APPDATA%\ye-shunguang-deskpet\skins\<id>\`，优先级更高**。
 - 没有 `manifest` 文件时自动进入贴纸占位模式，流程照常。
 
 ## 附录B · 人设写作要点

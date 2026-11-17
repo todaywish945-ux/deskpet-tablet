@@ -68,7 +68,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 整合包目录：<仅 B 需要；GPT-SoVITS 整合包解压后的目录，纯英文路径>
 
 【进度管理（最先做）】
-进度文件 %APPDATA%\deskpet-tablet\配置进度.json（安装包版以实际应用数据目录为准，阶段 2 会定位），
+进度文件 %APPDATA%\ye-shunguang-deskpet\配置进度.json（安装包版以实际应用数据目录为准，阶段 2 会定位），
 格式 {"stage":"","status":"done|failed","evidence":""}。
 已存在则跳过 status=done 的阶段从断点继续，绝不重做。每完成/失败一个阶段立即更新它。
 
@@ -230,7 +230,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
    ▶ bailian（在线克隆，参考音频 ≠ 无 时）：
      a. 把我的参考音频复制覆盖为 <框架目录>\assets\voice\reference.mp3；
      b. setx DASHSCOPE_API_KEY "<百炼Key>"（Key=无 时同样走"引导我拿 Key"）；
-     c. 读 %APPDATA%\deskpet-tablet\data\config.json，如果 tts.voice 已经非空，
+     c. 读 %APPDATA%\ye-shunguang-deskpet\data\config.json，如果 tts.voice 已经非空，
         跳过注册（防止重复创建音色），只报告现有音色；
      d. 否则在框架目录执行 node scripts/enroll-and-test.mjs。
         脚本会自己检查音频，结尾输出「已写入配置（合并模式）」并生成 scripts\试听.wav，
@@ -238,7 +238,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
    ▶ bailian 且参考音频 = 无：跳过语音，记录「暂无语音，文字聊天可用」。
    ▶ gptsovits（本地免费）：
      a. 确认整合包目录存在且路径为纯英文，不是就停下问我；
-     b. 把 %APPDATA%\deskpet-tablet\data\config.json 的 tts 段改为：
+     b. 把 %APPDATA%\ye-shunguang-deskpet\data\config.json 的 tts 段改为：
         "enabled": true, "provider": "gptsovits",
         "gsvApiBase": "http://127.0.0.1:9880",
         "gsvRefAudio": "<参考音频绝对路径>",
@@ -258,13 +258,13 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 1. 把我的人设 .md 复制覆盖 assets\skins\template\prompts\character.md
    （先读一下确认它末尾保留 [emotion:xxx] 情绪协议段，被删了就在我原文件后面补上这一节）；
 2. 按 <框架目录>\ASSET-GUIDE.md 把头像/动画/贴纸放进 assets\skins\template\；
-3. 读 %APPDATA%\deskpet-tablet\data\config.json，把 character.skin 改为 "template"。
+3. 读 %APPDATA%\ye-shunguang-deskpet\data\config.json，把 character.skin 改为 "template"。
 验收：persona 指向的文件存在；（若放了 manifest）引用文件全部存在；config 已指向对应皮肤。
 
 【阶段 4 · 启动与冒烟】
 1. 在框架目录用**新窗口**启动 npm run dev（别阻塞你的终端），等 30 秒。
 2. 程序化冒烟：访问 http://127.0.0.1:37820/health，返回 JSON 即应用活着；
-   不通就等 10 秒重试 3 次；仍不通读 %APPDATA%\deskpet-tablet\logs\ 最新日志定位，
+   不通就等 10 秒重试 3 次；仍不通读 %APPDATA%\ye-shunguang-deskpet\logs\ 最新日志定位，
    最小化修复后重启再测。
 3. 冒烟通过后【停下问我】：让我人眼确认桌面上出现平板窗口、打字有回复。
 验收：/health 返回 JSON + 我确认看到了界面。
@@ -272,7 +272,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 【阶段 5 · 交付报告（对话确认通过后再做）】
 给我一份最终清单：
 - 每阶段结果与一句话证据；
-- %APPDATA%\deskpet-tablet\data\config.json 的 llm/tts/character 三段内容（**Key 打码**）；
+- %APPDATA%\ye-shunguang-deskpet\data\config.json 的 llm/tts/character 三段内容（**Key 打码**）；
 - 试听.wav 路径（如果注册过）；
 - 接下来我要自己做的事：点开听试听效果 / 以后换素材就改 template 目录 / 想打包就执行 npm run dist。
 
@@ -446,7 +446,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 
 ```text
 帮我把桌宠语音从百炼切到本地 GPT-SoVITS。整合包在 <整合包目录>（纯英文路径）。
-改 %APPDATA%\deskpet-tablet\data\config.json 的 tts 段：
+改 %APPDATA%\ye-shunguang-deskpet\data\config.json 的 tts 段：
   "enabled": true, "provider": "gptsovits",
   "gsvApiBase": "http://127.0.0.1:9880",
   "gsvRefAudio": "<3~10 秒参考音频绝对路径>",
@@ -456,5 +456,5 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 其他字段不动，改完读回确认。然后重启桌宠（结束 node/electron 进程后在框架目录
 npm run dev），她说第一句话时会自动拉起本地服务，首次等 1~2 分钟。
 验收：读回的 tts 段一致 + 她说话有声。失败就读
-%APPDATA%\deskpet-tablet\logs\gsv-autostart.log 最后 30 行贴给我。
+%APPDATA%\ye-shunguang-deskpet\logs\gsv-autostart.log 最后 30 行贴给我。
 ```
