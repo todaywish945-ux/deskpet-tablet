@@ -100,6 +100,8 @@
 ① → 附录F《智谱开放平台开通教程》；② → 附录E《火山引擎（豆包）开通教程》；
 ③ → 附录G《硅基流动开通教程》；④ → 附录H《阿里云百炼（通义千问）开通教程》；
 ⑤ → 问我要 baseUrl（OpenAI 兼容、能拼 /chat/completions）、模型名和 Key。
+如果我只给了 Key 没写厂商：先问我这是哪家的 Key（ark- 开头 = 火山引擎豆包；
+分不清就问我是在哪个网站注册的），不要默认按智谱处理。
 每步只发一条，等我确认再继续；Key 不许出现在任何汇报里。
 拿到 Key 后，把 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 llm 三项
 （baseUrl / model / apiKey）写成对应教程里的值，其他字段不动，改完读回确认（Key 打码）。
