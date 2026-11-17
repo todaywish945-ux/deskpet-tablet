@@ -126,6 +126,15 @@ footer {
   justify-content: space-between;
 }
 
+.copyright {
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 1px solid #1f2532;
+  font-size: 11px;
+  line-height: 1.7;
+  color: #66707e;
+}
+
 #status {
   color: #43e6a0;
   font-size: 13px;
