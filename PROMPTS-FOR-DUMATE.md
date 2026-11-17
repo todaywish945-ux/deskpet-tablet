@@ -105,9 +105,9 @@
 每步只发一条，等我确认再继续；Key 不许出现在任何汇报里。
 拿到 Key 后，把 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 llm 三项
 （baseUrl / model / apiKey）写成对应教程里的值，其他字段不动，改完读回确认（Key 打码）。
-另外（仅新版支持）：如果设置里有「备用接口」、或我让你配跨厂商兜底，就把第二家填进
-config.json 的 llm.backup 三项（baseUrl / model / apiKey，不许复用主模型 Key）；
-没有这个功能就告诉我「当前版本不支持，等新版」，不要硬写字段。
+敲敲版设置里有「备用接口」：如果我要配跨厂商兜底，就把第二家填进 config.json 的
+llm.backup 三项（baseUrl / model / apiKey，不许复用主模型 Key）；设置里找不到这项就说明是旧版，
+跳过并告诉我。
 ```
 
 **✅ 成功标准**：config.json 的 `llm` 三项（baseUrl/model/apiKey）齐全非空；发一条消息她有回复。
