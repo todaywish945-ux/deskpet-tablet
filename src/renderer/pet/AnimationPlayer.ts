@@ -85,11 +85,16 @@ export class AnimationPlayer {
   private fadeToken = 0
   private monitorStarted = false
   private failStreak = 0
+  private blankTicks = 0
+  /** 岛收起期间画面是主动冻结的：空白自愈必须让路 */
+  private frozen = false
 
   /** 说话风格的进出场过渡片段映射 */
   private transitions: Record<string, { enter: string; exit: string }> = {}
   /** 正在播"待机→说话"过渡：结束后链入该说话片段（音频未到则停在过渡尾帧等） */
   private enteringTalk: string | null = null
+  /** 过渡链入兜底：ended 事件丢失（例如过渡期间被点按切层）时强制恢复说话画面 */
+  private enteringTimer: ReturnType<typeof setTimeout> | null = null
   /** 正在播"说话→待机"过渡：结束后回待机循环 */
   private exiting = false
 
@@ -145,13 +150,16 @@ export class AnimationPlayer {
 
   /** 灵动岛收起前冻结画面：两路视频都暂停（rAF 监控对 paused 片段本来就跳过，不会误判卡死） */
   pauseAll(): void {
+    this.frozen = true
     for (const video of this.layers) video.pause()
   }
 
-  /** 平板从岛态唤回后从冻结处续播 */
+  /** 平板从岛态唤回后从冻结处续播；两路都没画面（换层中途被打断）时强制重画 */
   resumeAll(): void {
+    this.frozen = false
     const current = this.layers[this.activeLayer]
     if (current && current.src) void current.play().catch(() => undefined)
+    if (!this.layers.some((v) => Number(v.style.opacity || '0') > 0.5)) this.render(true)
   }
 
   /** 用户开口/闭口 */
@@ -176,8 +184,20 @@ export class AnimationPlayer {
         this.emotionTimer = null
       }
       this.emotion = null
-      // "待机→说话"过渡还在播：不切画面，过渡播完由 onClipFinished 链入说话循环
-      if (this.enteringTalk) return
+      // "待机→说话"过渡还在播：不切画面，过渡播完由 onClipFinished 链入说话循环。
+      // 但过渡片已不在播（被点按切层/ended 丢失/停帧）时标记会卡死，必须清掉继续开口
+      if (this.enteringTalk) {
+        const stuckStyle = this.enteringTalk
+        const tr = this.transitions[stuckStyle]
+        const cur = this.layers[this.activeLayer]
+        const stillPlaying = !!cur && !!tr?.enter && cur.src.endsWith(tr.enter) && !cur.ended && !cur.paused
+        if (stillPlaying) return
+        this.enteringTalk = null
+        if (this.enteringTimer) {
+          clearTimeout(this.enteringTimer)
+          this.enteringTimer = null
+        }
+      }
       if (this.talkList.length > 0) {
         // 从待机重新开口：选说话方式。已有情绪指引时按情绪选，否则随机避开上一次用的
         if (this.emotion && this.talkForEmotion(this.emotion)) {
@@ -192,8 +212,9 @@ export class AnimationPlayer {
       // 本来就在说话（打断续聊）则不重播过渡
       const style = this.currentTalk
       const tr = style ? this.transitions[style] : null
-      if (tr?.enter && !wasTalking) {
+      if (style && tr?.enter && !wasTalking) {
         this.enteringTalk = style
+        this.armEnteringTimer(style)
         this.showVideo(`${this.base}/animations/${tr.enter}`, { loop: false }, true, 200)
         this.preloadHidden(`${this.base}/animations/${style}`, 300)
         return
@@ -317,6 +338,23 @@ export class AnimationPlayer {
     }
   }
 
+  /** 过渡片兜底：2s 内没有链入说话循环（ended 丢失/被切层）就强制清标记并补播，避免卡在待机 */
+  private armEnteringTimer(style: string): void {
+    if (this.enteringTimer) clearTimeout(this.enteringTimer)
+    this.enteringTimer = setTimeout(() => {
+      this.enteringTimer = null
+      if (this.enteringTalk !== style) return
+      this.enteringTalk = null
+      if (this.state === 'talk') {
+        this.showVideo(`${this.base}/animations/${style}`, { loop: true }, true, 120)
+        const tr = this.transitions[style]
+        if (tr?.exit) this.preloadHidden(`${this.base}/animations/${tr.exit}`)
+      } else {
+        this.render()
+      }
+    }, 2000)
+  }
+
   /** 展示情绪（一段时间后自动回落到说话/待机）。情绪同时决定本条回复的说话风格 */
   setEmotion(name: string): void {
     this.emotion = name
@@ -376,6 +414,10 @@ export class AnimationPlayer {
     if (this.enteringTalk && endedVideo && endedVideo === this.layers[this.activeLayer]) {
       const talk = this.enteringTalk
       this.enteringTalk = null
+      if (this.enteringTimer) {
+        clearTimeout(this.enteringTimer)
+        this.enteringTimer = null
+      }
       if (this.state === 'talk') {
         this.showVideo(`${this.base}/animations/${talk}`, { loop: true }, true, 120)
         // 说话占住一层后，把出场过渡预载进空闲层，收口时零等待
@@ -429,10 +471,28 @@ export class AnimationPlayer {
         this.checkLoopPoints()
         this.checkLoopFade()
         this.checkStuck()
+        this.checkBlank()
       }
       requestAnimationFrame(tick)
     }
     requestAnimationFrame(tick)
+  }
+
+  /** 悬空自愈：两路视频都透明超过 ~1.5s（换层中途 play 挂起/被打断）→ 画面只剩壁纸，强制按状态重画 */
+  private checkBlank(): void {
+    if (this.frozen || document.visibilityState !== 'visible') {
+      this.blankTicks = 0
+      return
+    }
+    if (this.layers.some((v) => Number(v.style.opacity || '0') > 0.5)) {
+      this.blankTicks = 0
+      return
+    }
+    this.blankTicks++
+    if (this.blankTicks > 90) {
+      this.blankTicks = 0
+      this.render(true)
+    }
   }
 
   private lastTime = 0
@@ -470,6 +530,10 @@ export class AnimationPlayer {
     this.settleIdx = 0
     this.exiting = false
     this.enteringTalk = null
+    if (this.enteringTimer) {
+      clearTimeout(this.enteringTimer)
+      this.enteringTimer = null
+    }
     this.pendingSettle = null
     this.settling = null
     this.cancelFinishTimer()

@@ -17,7 +17,37 @@ const ovClockEl = document.getElementById('ov-clock') as HTMLDivElement
 const lastMsgEl = document.getElementById('last-msg') as HTMLDivElement
 const stripDotEl = document.getElementById('strip-dot') as HTMLElement
 
-// 头像位已固定为敲敲图标（assets/icons/knock-knock.svg），不再随皮肤切换
+const stripAvatar = document.querySelector('.strip-avatar') as HTMLImageElement | null
+const capsuleAvatar = document.querySelector('.avatar img') as HTMLImageElement | null
+const cardAvatar = document.querySelector('.card-avatar') as HTMLImageElement | null
+const nameEl = document.getElementById('name') as HTMLSpanElement
+const ovNameEl = document.querySelector('.ov-name') as HTMLDivElement | null
+
+/** 头像/名字跟随当前皮肤（换角色后 config-changed 会再同步一次） */
+async function applySkinIdentity(): Promise<void> {
+  try {
+    const meta = (await (await fetch(`petasset://skin/skin.json?ts=${Date.now()}`)).json()) as {
+      name?: string
+      avatar?: string
+    }
+    if (meta?.avatar) {
+      const url = `petasset://skin/${meta.avatar}?v=${Date.now()}`
+      for (const img of [stripAvatar, capsuleAvatar, cardAvatar]) {
+        if (img) img.src = url
+      }
+    }
+    if (meta?.name) {
+      nameEl.textContent = meta.name
+      if (ovNameEl) ovNameEl.textContent = meta.name
+    }
+  } catch {
+    // 皮肤清单读不到：保留 HTML 里的默认头像/名字
+  }
+}
+void applySkinIdentity()
+api.on('pet:config-changed', () => {
+  void applySkinIdentity()
+})
 
 // ---------- 时钟 ----------
 

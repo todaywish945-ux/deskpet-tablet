@@ -192,14 +192,15 @@
           </div>
 
           <div id="chat-area">
+            <!-- 时间顺序：我发的在上，她的回复在下（行序即上下序，别调换） -->
+            <div id="toast-row" class="msg-row me hidden">
+              <span class="kk-avatar kk-avatar-user"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 5v1h14v-1c0-3-3-5-7-5z"/></svg></span>
+              <div id="user-toast" class="hidden"></div>
+            </div>
             <!-- 敲敲式消息行：头像 + 气泡（隐藏类挂在行上，头像随气泡一起显隐） -->
             <div id="bubble-row" class="msg-row her hidden">
               <img id="bubble-avatar" class="kk-avatar" alt="" draggable="false" />
               <div id="bubble" class="hidden"><span id="bubble-text"></span></div>
-            </div>
-            <div id="toast-row" class="msg-row me hidden">
-              <span class="kk-avatar kk-avatar-user"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 100-8 4 4 0 000 8zm0 2c-4 0-7 2-7 5v1h14v-1c0-3-3-5-7-5z"/></svg></span>
-              <div id="user-toast" class="hidden"></div>
             </div>
           </div>
 

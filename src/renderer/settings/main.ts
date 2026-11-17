@@ -18,7 +18,6 @@ const fields = {
   proActive: $<HTMLInputElement>('pro-active'),
   proHealth: $<HTMLInputElement>('pro-health'),
   appAutoStart: $<HTMLInputElement>('app-autostart'),
-  callBargeIn: $<HTMLInputElement>('call-bargein'),
   ttsEnabled: $<HTMLInputElement>('tts-enabled'),
   ttsProvider: $<HTMLSelectElement>('tts-provider'),
   bailianBlock: $<HTMLDivElement>('bailian-block'),
@@ -84,7 +83,6 @@ function fillForm(data: AppConfig): void {
   fields.proActive.checked = data.proactive?.enabled ?? true
   fields.proHealth.checked = data.proactive?.health ?? true
   fields.appAutoStart.checked = data.app?.autoStart ?? false
-  fields.callBargeIn.checked = data.call?.bargeIn ?? true
   fields.ttsEnabled.checked = data.tts.enabled
   fields.ttsProvider.value = data.tts.provider ?? 'bailian'
   switchProvider(data.tts.provider ?? 'bailian')
@@ -127,9 +125,6 @@ function collectConfig(): AppConfig {
     },
     app: {
       autoStart: fields.appAutoStart.checked
-    },
-    call: {
-      bargeIn: fields.callBargeIn.checked
     },
     tts: {
       enabled: fields.ttsEnabled.checked,

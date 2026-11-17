@@ -108,6 +108,9 @@ if (!gotLock) {
 } else {
   // 语音播报不依赖用户手势触发 AudioContext
   app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+  // 透明窗口 + 视频：禁用系统级视频叠加层。叠加层无视页面圆角裁剪，
+  // 说话时视频层频繁切换/淡入淡出被提升的那几帧会在窗口四角漏出直角方块（闪角）
+  app.commandLine.appendSwitch('disable-direct-composition-video-overlays')
   // PET_REMOTE_DEBUG=1 时开 CDP 调试端口（渲染层调试取证用）；端口可用
   // PET_REMOTE_DEBUG_PORT 覆盖（默认 9222 被幽灵句柄占着时换个口即可）
   if (process.env['PET_REMOTE_DEBUG'] === '1') {

@@ -56,11 +56,6 @@ export interface AppFlagsConfig {
   autoStart: boolean
 }
 
-export interface CallConfig {
-  /** 通话中她说话时检测到你开口就自动停下沉听（barge-in） */
-  bargeIn: boolean
-}
-
 /** 平板窗口层级：bottom=沉底（藏在所有应用窗口之下，点击平板浮上来）；top=置顶（悬浮在所有应用之上） */
 export type PetLayerMode = 'bottom' | 'top'
 
@@ -103,7 +98,6 @@ export interface AppConfig {
   character: CharacterConfig
   proactive: ProactiveConfig
   app: AppFlagsConfig
-  call: CallConfig
 }
 
 export interface ChatMessage {
@@ -191,9 +185,6 @@ export const DEFAULT_CONFIG: AppConfig = {
   },
   app: {
     autoStart: false
-  },
-  call: {
-    bargeIn: true
   }
 }
 

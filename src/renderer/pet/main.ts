@@ -163,17 +163,35 @@ function showThinking(): void {
   showBubble('<span class="dots"><i></i><i></i><i></i></span>')
 }
 
-function showUserToast(text: string): void {
+function showUserToast(text: string, autoFadeMs = 60_000): void {
   userToast.textContent = text
   // 内层气泡自身也带着 HTML 初始的 hidden（与 #bubble 同款双重 hidden）
   userToast.classList.remove('hidden')
   toastRow.classList.remove('hidden', 'fade')
-  if (userToastTimer) clearTimeout(userToastTimer)
-  userToastTimer = setTimeout(() => {
-    toastRow.classList.add('fade')
-    setTimeout(() => toastRow.classList.add('hidden'), 700)
-  }, 3600)
+  if (userToastTimer) {
+    clearTimeout(userToastTimer)
+    userToastTimer = null
+  }
+  // 按传入时长自动淡出；用户消息 3 秒（发出去就别一直占着画面），
+  // 系统提示类（bridge 接管声音等）按 60 秒兜底
+  if (autoFadeMs > 0) userToastTimer = setTimeout(fadeUserToast, autoFadeMs)
 }
+
+function hideUserToast(): void {
+  if (userToastTimer) {
+    clearTimeout(userToastTimer)
+    userToastTimer = null
+  }
+  toastRow.classList.add('hidden')
+  toastRow.classList.remove('fade')
+}
+
+function fadeUserToast(): void {
+  userToastTimer = null
+  toastRow.classList.add('fade')
+  setTimeout(() => toastRow.classList.add('hidden'), 700)
+}
+
 
 // ---------- 事件接线 ----------
 
@@ -270,7 +288,7 @@ api.on('pet:state', (state) => {
 })
 
 api.on('pet:user-message', (text, sessionId) => {
-  showUserToast(String(text))
+  showUserToast(String(text), 3000)
   // 带会话 id 时只在它是当前展示的会话才补行，防止串台
   if (!sessionId || currentSession?.id === sessionId) appendHomeUserRow(String(text))
   renderHistoryIfOpen()
@@ -371,7 +389,6 @@ function armTalkWatchdog(): void {
     if (!hadAudioThisTurn) return
     waveform.classList.remove('on')
     callLabel.textContent = '视频通话中'
-    stopVad()
     player.finishTalkingAt(0)
   }, TALK_WATCHDOG_MS)
 }
@@ -394,9 +411,6 @@ api.on('pet:tts-start', () => {
   hadAudioThisTurn = false
   player.setTalking(true)
   armTalkWatchdog()
-  // 她开口后稍等片刻再架起人声监听（barge-in）：避开过渡与首帧爆音
-  if (bargeArmTimer) clearTimeout(bargeArmTimer)
-  bargeArmTimer = setTimeout(armBargeIn, 700)
 })
 
 api.on('pet:tts-chunk', (chunk) => {
@@ -414,7 +428,6 @@ api.on('pet:interrupt', () => {
   clearTalkWatchdog()
   player.cancelFinishTimer()
   clearSettlePoll()
-  stopVad()
 })
 
   // 收口轮询：tts-end 后每 250ms 读真实剩余音频，≤450ms 或已停播才收口。
@@ -432,7 +445,6 @@ api.on('pet:tts-end', () => {
   clearTalkWatchdog()
   waveform.classList.remove('on')
   callLabel.textContent = '视频通话中'
-  stopVad()
   if (!hadAudioThisTurn) {
     // 本轮从未出声（合成失败等）：直接回待机，不播出场过渡
     player.setTalking(false)
@@ -476,18 +488,19 @@ api.on('pet:config-changed', () => {
 // 只关音量不停播报：动画/口型/状态机照常，面板一关声音自动还回来。
 // 静音必须留痕——"张嘴说不出话"的头号来源就是它，无声时让用户当场知道声音去哪了
 let bridgeOwnsAudio = false
+/** 设置里的语音音量（0~1）：之前只存配置没接到播放端，导致她一直按满音量说话 */
+let ttsVolume = 1
 api.on('pet:bridge-audio-sink', (on) => {
   bridgeOwnsAudio = on === true
-  pcm.setVolume(bridgeOwnsAudio ? 0 : 1)
+  pcm.setVolume(bridgeOwnsAudio ? 0 : ttsVolume)
   showUserToast(bridgeOwnsAudio ? '声音正在 dsh 面板播放（平板静音中）' : '声音回到平板了')
 })
 
 // ---------- 灵动岛（独立岛窗口）----------
 
-/** 主进程闲置计时到点请求收起平板：守卫不过（录音中/她在播）静默忽略，主进程稍后重试 */
+/** 主进程闲置计时到点请求收起平板：守卫不过（她在播）静默忽略，主进程稍后重试 */
 api.on('pet:tablet-hide-request', () => {
   if (pcm.busy) return
-  stopVad() // 人都不在了，收起就别再占着麦克风监听
   player.pauseAll()
   void api.applyTabletHide()
 })
@@ -914,20 +927,26 @@ topicInput.addEventListener('keydown', (event) => {
   void startCall()
 })
 
-/** 主界面聊天窗直接打字：发出去，她照常语音回复（runTurn 与视图无关） */
+/** 主界面聊天窗直接打字：发出去，她照常语音回复（runTurn 与视图无关）。
+ *  发送成功才清空输入框；失败把字还回去，避免"点发送直接消失、她没收到" */
 async function sendFromHome(): Promise<void> {
   const text = homeChatInput.value.trim()
   if (!text) return
-  homeChatInput.value = ''
-  if (!currentSession) {
-    // 没建档就现场建一个（标题会自动取这条消息），进聊天窗再发
-    const session = await api.createSession('')
-    if (!session) return
-    currentSession = session
-    showSessionView(session)
-    await renderSessions()
+  try {
+    if (!currentSession) {
+      // 没建档就现场建一个（标题会自动取这条消息），进聊天窗再发
+      const session = await api.createSession('')
+      if (!session) throw new Error('新建会话失败')
+      currentSession = session
+      showSessionView(session)
+      await renderSessions()
+    }
+    await api.send(text)
+    if (homeChatInput.value.trim() === text) homeChatInput.value = ''
+  } catch (error) {
+    homeChatInput.value = text
+    console.error('[send]', error)
   }
-  await api.send(text)
   homeChatInput.focus()
 }
 
@@ -1001,6 +1020,7 @@ profileClose.addEventListener('click', () => {
 function showView(view: 'home' | 'call'): void {
   currentView = view
   api.notifyView?.(view) // 上报主进程：控制桥的通话端点据此判断通话是否进行中
+  if (view === 'call') hideUserToast() // 新通话从干净的对话区开始（上一条提问不残留）
   homeView.classList.toggle('hidden', view !== 'home')
   callView.classList.toggle('hidden', view !== 'call')
   if (view === 'home') {
@@ -1013,9 +1033,8 @@ function showView(view: 'home' | 'call'): void {
   }
 }
 
-/** 挂断：停录音/VAD/播报，回主界面并刷新这段会话（挂断按钮与控制桥 pet:call-end 共用） */
+/** 挂断：停播报，回主界面并刷新这段会话（挂断按钮与控制桥 pet:call-end 共用） */
 function hangup(): void {
-  stopVad()
   void api.stop()
   pcm.stop()
   player.cancelFinishTimer()
@@ -1088,95 +1107,17 @@ historyToggle.addEventListener('click', () => {
 
 historyClose.addEventListener('click', () => historyPanel.classList.remove('open'))
 
-// ---------- 通话中打断（barge-in）：她说话时你开口，她立即停下沉听 ----------
-
-const VAD_LOUD = 0.055 // 持续高于它 ≈ 你在说话
-const VAD_QUIET = 0.03 // 低于它 ≈ 说完了
-const VAD_LOUD_MS = 320 // 防单帧噪声：要持续响这么久才算真的开口
-const VAD_SILENCE_MS = 1400 // 说完后静默这么久自动收音
-const VAD_MIN_SPEECH_MS = 700 // 至少说这么久才收音（太短≈误触）
-
-let bargeInEnabled = true
-let bargeArmTimer: ReturnType<typeof setTimeout> | null = null
-let vadStream: MediaStream | null = null
-let vadTimer: ReturnType<typeof setInterval> | null = null
-let vadLoudSince = 0
+// ---------- 通话设置（语音音量） ----------
 
 async function refreshCallFlags(): Promise<void> {
   try {
     const config = await window.settingsAPI.getConfig()
-    bargeInEnabled = config.call?.bargeIn !== false
+    const volume = Number(config.tts?.volume)
+    if (Number.isFinite(volume)) ttsVolume = Math.min(1, Math.max(0, volume))
+    pcm.setVolume(bridgeOwnsAudio ? 0 : ttsVolume)
   } catch {
     // 保持默认
   }
-}
-
-/** 释放监听流和计时器 */
-function stopVad(): void {
-  if (bargeArmTimer) {
-    clearTimeout(bargeArmTimer)
-    bargeArmTimer = null
-  }
-  if (vadTimer) {
-    clearInterval(vadTimer)
-    vadTimer = null
-  }
-  if (vadStream) {
-    vadStream.getTracks().forEach((track) => track.stop())
-    vadStream = null
-  }
-  vadLoudSince = 0
-}
-
-function armBargeIn(): void {
-  if (!bargeInEnabled || currentView !== 'call') return
-  void (async () => {
-    try {
-      vadStream = await navigator.mediaDevices.getUserMedia({
-        audio: { echoCancellation: true, noiseSuppression: true } // 回声消除：别把她的声音当成人声
-      })
-    } catch {
-      return
-    }
-    if (!vadStream || currentView !== 'call') {
-      vadStream?.getTracks().forEach((track) => track.stop())
-      vadStream = null
-      return
-    }
-    const ctx = new AudioContext()
-    const analyser = ctx.createAnalyser()
-    analyser.fftSize = 512
-    ctx.createMediaStreamSource(vadStream).connect(analyser)
-    const buf = new Float32Array(analyser.fftSize)
-    vadLoudSince = 0
-    vadTimer = setInterval(() => {
-      if (!vadStream) return
-      analyser.getFloatTimeDomainData(buf)
-      let sum = 0
-      for (const v of buf) sum += v * v
-      const rms = Math.sqrt(sum / buf.length)
-      if (rms > VAD_LOUD) {
-        if (!vadLoudSince) vadLoudSince = Date.now()
-        if (Date.now() - vadLoudSince >= VAD_LOUD_MS) {
-          // 你开口了：切断她的音频让位。语音输入已移除——打断只停她，不再录音转写
-          const stream = vadStream
-          vadStream = null
-          if (vadTimer) {
-            clearInterval(vadTimer)
-            vadTimer = null
-          }
-          vadLoudSince = 0
-          void ctx.close().catch(() => undefined)
-          stream?.getTracks().forEach((track) => track.stop())
-          pcm.stop()
-          void api.stop() // 主进程取消整轮，pet:interrupt 会清画面状态
-          showUserToast('听到你说话了，我先停一下（可在设置里关闭自动打断）')
-        }
-      } else {
-        vadLoudSince = 0
-      }
-    }, 60)
-  })()
 }
 
 // ---------- 输入与拖动 ----------
@@ -1185,9 +1126,18 @@ form.addEventListener('submit', (event) => {
   event.preventDefault()
   const text = input.value.trim()
   if (!text) return
-  input.value = ''
   pcm.stop() // 她还在说上一句时直接切到新对话
-  void api.send(text)
+  // 发送成功才清空：主进程重启/热更新导致 invoke 失败时，把字还回输入框并提示，
+  // 不然就是"点发送直接消失、她根本没收到"
+  api
+    .send(text)
+    .then(() => {
+      if (input.value.trim() === text) input.value = ''
+    })
+    .catch((error) => {
+      input.value = text
+      showBubble(escapeHtml(`没发出去：${(error as Error)?.message || '请再试一次'}`), true)
+    })
   input.focus()
 })
 

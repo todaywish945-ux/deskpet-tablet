@@ -10,7 +10,8 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
-    "dist": "electron-vite build && electron-builder --win"
+    "dist": "electron-vite build && electron-builder --win",
+    "verify:ui": "node scripts/verify-ui.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
