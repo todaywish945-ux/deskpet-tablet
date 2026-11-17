@@ -53,11 +53,17 @@ npm run dist       # 打包 Windows 安装包（NSIS → dist_app/）
 3. **形象与人设**：复制 `assets/skins/template` 为你的皮肤，填入人设与素材，设置里选择
 4. 回到平板，开始聊天
 
-**对话模型怎么选（不用纠结厂商）**：
+**对话模型怎么选（四家国内直连 + 自备 Key，装包时 AI 会把选项发给你选）**：
 
-- **默认、推荐**：智谱开放平台（bigmodel.cn）的免费 Flash 档，注册即用、无需绑卡；模型填 `glm-4.5-flash`（控制台提示下线就换 `glm-4.7-flash`，再不行 `glm-4-flash`）。
-- **想换豆包（火山引擎方舟）**：开通步骤见 [AUTOSETUP.md](AUTOSETUP.md) 文末《附录 · 火山引擎（豆包）开通教程》，模型填 `doubao-seed-2-1-lite-260915`（以控制台开通管理页为准）。
-- **其他任何 OpenAI 兼容接口**都可以：设置里换成对应的 Base URL / API Key / 模型即可。
+| 选项 | 优点 | 缺点 | 免费情况 | Base URL | 模型示例 |
+|---|---|---|---|---|---|
+| 智谱 GLM（默认推荐） | 长期免费、中文口语好、注册最简单 | 高峰排队、模型版本会轮换 | Flash 系列长期免费 | `https://open.bigmodel.cn/api/paas/v4` | `glm-4.5-flash`（下线则 `glm-4.7-flash` / `glm-4-flash`） |
+| 火山引擎豆包 | 额度大方、单价便宜、口语自然 | 开通步骤最多、「每天免费」需数据授权 | 开通送免费额度 | `https://ark.cn-beijing.volces.com/api/v3` | `doubao-seed-2-1-lite-260915` |
+| 硅基流动 | 一个 Key 多家模型、注册快、国内直连 | 免费只有小模型、语气平淡 | 免费开源小模型多 | `https://api.siliconflow.cn/v1` | `Qwen/Qwen3-8B` 等 |
+| 阿里云百炼 | 中文质量好、额度大、云服务稳定 | 额度有有效期、控制台步骤较多 | 新用户每模型约 100 万 tokens | `https://dashscope.aliyuncs.com/compatible-mode/v1` | `qwen-flash` |
+
+- 每家注册 / 拿 Key / 填配置的**一步一步教程**都在 [AUTOSETUP.md](AUTOSETUP.md) 文末附录，安装时 AI 搭子会把选项发给你、选哪家走哪家。
+- 已有自己的 Key / 其他 OpenAI 兼容接口：设置里填对应的 Base URL / API Key / 模型即可。
 - 免费档高峰期偶尔排队属正常，稍等或再发一次即可。
 
 不想动手？把 [AUTOSETUP.md](AUTOSETUP.md) 里的总控指令整段发给会操作电脑的

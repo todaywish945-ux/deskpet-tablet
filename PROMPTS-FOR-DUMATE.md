@@ -70,44 +70,42 @@
 
 ---
 
-## 卡2 · 选对话模型 + 填 Key（默认智谱免费档）
+## 卡2 · 选对话模型 + 填 Key（先选厂商，再按教程走）
 
-> 默认就走**智谱免费档**，不用纠结厂商：模型填 `glm-4.5-flash`（控制台提示下线就换 `glm-4.7-flash`，再不行 `glm-4-flash`）。
-> 想用豆包（火山引擎）的看本卡方式 C，按 [附录E](#附录e--火山引擎豆包开通教程ai-转述版) 一步一步开通。
-> 推荐环境变量方式：写在环境变量里不怕被任何脚本或重装影响；框架检测到配置里没有 Key 时会自动读它。
+> 四家国内可直连的厂商都配了教程：搭子先把选项发给你选，再按对应附录一步一步带你注册、拿 Key、填配置。
+> 什么都不选的默认智谱免费档；已有 Key 的直接选「我自己的 Key」。
 
-**📋 给搭子的指令（复制，三选一）**
-
-方式 A（默认，环境变量）：
+**📋 给搭子的指令（复制）**
 
 ```text
-在用户环境变量里设置 ZHIPU_API_KEY，值为 <我的智谱 API Key>（bigmodel.cn 申请）：
-setx ZHIPU_API_KEY "<Key>"
-设置完读回变量值确认（Key 中间打码显示给我）。
+到配置对话模型这一步了。请先在聊天里把下面选项【原样】发给我（只发名称 + 一句话说明，
+不要发教程步骤），然后停下来等我回复：
+① 智谱 GLM（推荐 · 免费档够用）
+   优点：Flash 系列长期免费、手机号注册最简单、中文口语和人设表现好
+   缺点：高峰期偶尔排队；模型版本会轮换（4.5 下线就换 4.7 / 4-flash）
+② 火山引擎豆包
+   优点：免费额度大方、单价便宜、口语自然
+   缺点：开通步骤最多（实名 + 方舟 + 逐个开通模型 + 地域必须北京）；"每天免费"需授权数据用于训练
+③ 硅基流动
+   优点：一个 Key 能调很多家开源模型、注册快、国内直连
+   缺点：免费档只有 8B/9B 小模型，闲聊容易平淡、长对话容易忘人设；免费名单经常调整
+④ 阿里云百炼（通义千问）
+   优点：中文质量好、新用户每个模型约 100 万 tokens、云服务稳定；想用百炼克隆声音可一个平台搞定
+   缺点：免费额度有有效期（约 90~180 天）；控制台步骤较多（开通模型 + 创建 API-KEY）
+⑤ 我自己的 Key / 其他厂商
+   优点：完全自由，想用哪家/付费旗舰都行
+   缺点：网络、OpenAI 兼容性、费用都得自己负责
+⑥ 你帮我选 —— 默认按 ① 智谱免费档
+我选完（或者我直接说了厂商、给了 Key），按对应教程一步一步带我：
+① → 附录F《智谱开放平台开通教程》；② → 附录E《火山引擎（豆包）开通教程》；
+③ → 附录G《硅基流动开通教程》；④ → 附录H《阿里云百炼（通义千问）开通教程》；
+⑤ → 问我要 baseUrl（OpenAI 兼容、能拼 /chat/completions）、模型名和 Key。
+每步只发一条，等我确认再继续；Key 不许出现在任何汇报里。
+拿到 Key 后，把 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 llm 三项
+（baseUrl / model / apiKey）写成对应教程里的值，其他字段不动，改完读回确认（Key 打码）。
 ```
 
-方式 B（写进配置文件）：
-
-```text
-打开 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json，
-把 llm.baseUrl 设为 https://open.bigmodel.cn/api/paas/v4，
-llm.model 设为 glm-4.5-flash（控制台没有就 glm-4.7-flash，再不行 glm-4-flash），
-llm.apiKey 设为 <我的智谱 API Key>；其他任何字段都不许动。
-改完把 llm 段读一遍给我确认（Key 打码）。
-```
-
-方式 C（豆包 / 火山引擎）：
-
-```text
-我想用豆包（火山引擎）当对话模型。请按《附录E · 火山引擎（豆包）开通教程》
-一步一步带我开通（每步等我确认，不要一次发全部步骤；Key 不许打进汇报），
-拿到 Key 后写进 C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json：
-llm.baseUrl = https://ark.cn-beijing.volces.com/api/v3，
-llm.model = doubao-seed-2-1-lite-260915（以控制台「开通管理」页显示的模型 ID 为准），
-llm.apiKey = 我的豆包 Key。其他字段不动，改完读回确认（Key 打码）。
-```
-
-**✅ 成功标准**：变量读回有值，或 config.json 的 `llm` 三项（baseUrl/model/apiKey）齐全非空；发一条消息她有回复。
+**✅ 成功标准**：config.json 的 `llm` 三项（baseUrl/model/apiKey）齐全非空；发一条消息她有回复。
 
 **⚠️ 失败时补一句**：「如果 config.json 不存在，说明应用还没启动过。先执行一次卡4 的启动指令让它生成默认配置，再回来改。」
 
@@ -232,7 +230,7 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 **常见现象 → 先查什么**（贴给搭子能加快定位）：
 - 没声音 → config.json 的 `tts.voice` 是否为空（回卡1）；`tts.provider` 与实际引擎是否一致
 - 打字没回复 → `llm.apiKey` / `llm.model` / `llm.baseUrl` 三项是否都配置了（卡2）
-- 回复很慢或偶尔不回 → 免费档高峰排队，等十几秒或再发一次即可；想更稳就换豆包（卡2 方式 C）
+- 回复很慢或偶尔不回 → 免费档高峰排队，等十几秒或再发一次即可；想更稳就换豆包（卡2 的 ②）
 - 语音输入没反应 → 智谱 Key（ASR 与对话共用同一个 Key）
 - 窗口不见了 → 托盘图标右键退出重开；日志里找窗口创建报错
 
@@ -248,8 +246,8 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 第2步 音色注册：我的参考音频在 <路径>，百炼 Key 是 <Key>。
       把它覆盖为 assets\voice\reference.mp3，setx DASHSCOPE_API_KEY 后
       运行 node scripts/enroll-and-test.mjs，最后告诉我试听.wav 在哪。
-第3步 对话模型：默认智谱免费档（setx ZHIPU_API_KEY "<Key>"，模型 glm-4.5-flash）；
-      想用豆包就按附录E 一步一步带我开通，再把 llm 三项改成豆包的值。
+第3步 对话模型：先把卡2 的六个选项发给我选（默认 ① 智谱免费档），
+      再按对应附录一步步带我开通并写进 config.json 的 llm 三项。
 第4步 皮肤确认：内置叶瞬光皮肤在 assets\skins\yeshunguang（开箱即用），确认其
       skin.json 存在并把 config.json 的 character.skin 设为 yeshunguang
       （我给了自己的素材则按 ASSET-GUIDE 放进 template 并切到 template）。
@@ -262,6 +260,7 @@ C:\Users\<你>\AppData\Roaming\deskpet-tablet\data\config.json 的 tts 段：
 
 ## 附录E · 火山引擎（豆包）开通教程（AI 转述版）
 
+> 适合：想要便宜、口语自然的人。优点：免费额度大方、单价低；缺点：开通步骤最多，每日免费需数据授权。
 > 观众选了豆包时，按下面步骤**一步一步**带他操作：每步只发一条，等他回“好了/下一步”再继续；
 > 他明确说“全部发我”才一次性给全。界面改版时按名称找入口，找不到就让他截图给你。
 > Key 只写入本机配置文件，不许出现在任何汇报和日志里。
@@ -293,6 +292,67 @@ model = doubao-seed-2-1-lite-260915（以开通管理页显示的模型 ID 为�
 
 【计费说明】开通和创建 Key 都免费；只有调用才按量计费，lite 档很便宜，聊天陪伴每月几块钱以内。
 「每天免费 200 万 tokens」属于需要数据授权的协作奖励计划，不是无条件赠送，别向观众乱承诺。
+
+---
+
+## 附录F · 智谱开放平台开通教程（AI 转述版）
+
+> 适合：想要最简单、长期免费的人。优点：注册最快、中文口语好；缺点：高峰排队、模型版本会轮换。
+> 观众选智谱时（①），一步一步带：每步一条，等他确认再继续；Key 只写本机配置，汇报打码。
+
+【步骤 1 · 注册】打开 https://open.bigmodel.cn ，右上角「注册」，手机号注册并登录。
+【步骤 2 · 创建 API Key】进「控制台」→ 左侧「API Keys」（或「API 密钥」）→「创建 API Key」→ 复制保存（只完整显示一次）。
+【步骤 3 · 验证】到「体验中心」发一句「你好」，能回复 = 账号可用；提示实名就按页面完成实名认证。
+【步骤 4 · 写配置】data\config.json 的 llm 三项：
+  baseUrl = https://open.bigmodel.cn/api/paas/v4
+  model   = glm-4.5-flash（控制台没有就 glm-4.7-flash，再不行 glm-4-flash）
+  apiKey  = 刚复制的 Key
+【常见错误】401 = Key 复制不全；404 = 模型名写错，按上面顺序换；提示实名 = 完成实名认证。
+【计费】Flash 系列长期免费，聊天够用；高峰期偶尔排队，稍等或再发一次。
+
+---
+
+## 附录G · 硅基流动开通教程（AI 转述版）
+
+> 适合：想用一个 Key 试很多开源模型的人。优点：模型多、注册快；缺点：免费只有小模型，闲聊容易平淡。
+> 观众选硅基流动时（③），一步一步带：每步一条，等他确认；Key 只写本机配置，汇报打码。
+
+【步骤 1 · 注册】打开 https://cloud.siliconflow.cn ，手机号或微信注册登录。
+【步骤 2 · 实名】控制台按提示完成实名认证（免费模型需要）。
+【步骤 3 · 创建 Key】左侧「API 密钥」→「新建 API 密钥」→ 复制保存。
+【步骤 4 · 写配置】data\config.json 的 llm 三项：
+  baseUrl = https://api.siliconflow.cn/v1
+  model   = Qwen/Qwen3-8B（免费档主力；也可 THUDM/GLM-4-9B-0414、deepseek-ai/DeepSeek-R1-0528-Qwen3-8B）
+  apiKey  = 刚复制的 Key
+【验证】回应用发一条消息有回复即通。
+【注意】免费档是小模型 + 有速率限制：聊天够用，但人设和语气比 GLM 平淡；
+免费名单会调整，失败就回「模型广场」挑带“免费”标记的模型换上去。
+
+---
+
+## 附录H · 阿里云百炼（通义千问）开通教程（AI 转述版）
+
+> 适合：想要中文质量好、免费额度大的人。优点：稳定、每模型约 100 万 tokens；缺点：额度有有效期、步骤稍多。
+> 观众选百炼时（④），一步一步带：每步一条，等他确认；Key 只写本机配置，汇报打码。
+
+【步骤 1 · 注册实名】打开 https://www.aliyun.com 注册阿里云账号，完成个人实名认证。
+【步骤 2 · 进百炼】打开 https://bailian.console.aliyun.com ，首次进入按提示开通「大模型服务」。
+【步骤 3 · 创建 Key】右上角/左侧「API-KEY」→「创建我的 API-KEY」→ 复制保存。
+【步骤 4 · 开通模型】进「模型广场」搜 qwen-flash 并开通
+（新用户每个模型约 100 万 tokens 免费额度，有效期以控制台为准）。
+【步骤 5 · 写配置】data\config.json 的 llm 三项：
+  baseUrl = https://dashscope.aliyuncs.com/compatible-mode/v1
+  model   = qwen-flash（没有免费额度就挑模型广场里带「免费额度」的 qwen 模型）
+  apiKey  = 刚复制的 Key
+【常见错误】401 = Key 错；模型未开通/404 = 回步骤 4；额度用完 = 换模型或按量付费。
+
+---
+
+## 附录I · 自定义 OpenAI 兼容接口（⑤ 路线）
+
+问观众要三样：baseUrl（能拼出 /chat/completions 的地址，如 https://xxx/v1）、模型名、API Key；
+写入 data\config.json 的 llm 三项，重启验收。401/404/超时分别对应 Key、模型名、网络问题。
+海外接口（Gemini / Groq / OpenRouter 等）国内直连不稳定，新手不建议选。
 
 ---
 
