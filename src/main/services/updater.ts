@@ -164,11 +164,22 @@ export async function streamToFile(
   const out = createWriteStream(target)
   let received = 0
   let emittedAt = 0
+  // 测速感知：起步 12 秒后平均速度仍低于 400KB/s，就掐掉让调用方换线路重试
+  // （直连 GitHub 国内常见 300KB/s 上下，镜像往往快得多；"慢而不断"不该让用户干等）
+  const startedAt = Date.now()
+  const SLOW_SPEED_BPS = 400 * 1024
+  const SPEED_GRACE_MS = 12_000
+  let slowFlag = false
   const emit = (total: number, force = false): void => {
     const now = Date.now()
     if (force || now - emittedAt > 400) {
       emittedAt = now
       onProgress({ received, total })
+    }
+    const elapsed = now - startedAt
+    if (!slowFlag && elapsed > SPEED_GRACE_MS && received / (elapsed / 1000) < SLOW_SPEED_BPS) {
+      slowFlag = true
+      controller.abort()
     }
   }
   try {
@@ -188,6 +199,8 @@ export async function streamToFile(
     return received
   } catch (error) {
     out.destroy()
+    // 测速掐断换成明确信号，调用方按"换线路"处理而不是当失败文案甩给用户
+    if (slowFlag) throw new Error('SLOW_CHANNEL')
     throw error
   } finally {
     clearInterval(stallTimer)
@@ -223,15 +236,17 @@ export async function downloadLatestInstaller(sender: WebContents): Promise<Upda
       downloadedInstallerPath = target
       return { ok: true, path: target, viaMirror: attempt.viaMirror }
     } catch (error) {
-      lastError = error
       if (cancelRequested) {
         cancelRequested = false
         return { ok: false, error: '已取消下载' }
       }
+      // 测速掐断（SLOW_CHANNEL）：换下一线路静默重试；两路都慢才落到失败文案
+      lastError = (error as Error).message === 'SLOW_CHANNEL' ? new Error('SLOW_CHANNEL') : error
     }
   }
   activeDownload = null
-  return { ok: false, error: `下载失败：${lastError instanceof Error ? lastError.message : '网络异常'}` }
+  const reason = lastError instanceof Error ? lastError.message : '网络异常'
+  return { ok: false, error: `下载失败：${reason === 'SLOW_CHANNEL' ? '直连和镜像速度都不理想，请稍后再试' : reason}` }
 }
 
 export function cancelDownload(): void {

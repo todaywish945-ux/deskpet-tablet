@@ -186,16 +186,18 @@ export async function downloadSkin(id: string, sender: import('electron').WebCon
       // 旧版在位（可能正被播放器占用）：暂存，重启应用时替换
       return { ok: true, applied: false, pendingRestart: true, viaMirror: attempt.viaMirror }
     } catch (error) {
-      lastError = error
       if (skinCancelRequested) {
         skinCancelRequested = false
         activeSkinDownload = null
         return { ok: false, error: '已取消下载' }
       }
+      // 测速掐断（SLOW_CHANNEL）：换下一线路静默重试；两路都慢才落到失败文案
+      lastError = (error as Error).message === 'SLOW_CHANNEL' ? new Error('SLOW_CHANNEL') : error
     }
   }
   activeSkinDownload = null
-  return { ok: false, error: `下载失败：${lastError instanceof Error ? lastError.message : '网络异常'}` }
+  const reason = lastError instanceof Error ? lastError.message : '网络异常'
+  return { ok: false, error: `下载失败：${reason === 'SLOW_CHANNEL' ? '直连和镜像速度都不理想，请稍后再试' : reason}` }
 }
 
 /** userData 里同盘 rename 一般都能成；兜底走复制删除 */
