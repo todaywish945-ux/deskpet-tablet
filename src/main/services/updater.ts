@@ -12,9 +12,11 @@ const RELEASES_PAGE = `https://github.com/${REPO}/releases/latest`
 /** 安装包资产命名约定（release 流程定的）：qiaoqiao-setup-<package.json 版本>.exe。
  *  版本对比就用文件名里的这个号——tag（v1.2.x）和包版本（0.1.x）刻意不同轨，别拿 tag 比 */
 export const ASSET_NAME_RE = /qiaoqiao-setup-(\d+\.\d+\.\d+)\.exe/
-/** 直连失败自动套的镜像前缀。镜像服务更迭频繁（2026-11-21 实测 gh-proxy.com 已变成混淆页，
- *  ghproxy.net 活着且能代理页面+资产），换镜像时先跑 scripts/probe-update-mirrors.mjs 验证 */
-export const MIRROR = 'https://ghproxy.net/'
+/** 直连失败依序套的镜像前缀。镜像服务更迭频繁（2026-11-21 实测：gh-proxy.com 页面代理返回
+ *  混淆 JS 页但**文件代理快**（3.3MB/s vs ghproxy.net 劣化到 29KB/s）；ghproxy.net 页面可用但
+ *  间歇 500。下载链路直连→两个镜像依序试 + 测速感知自动跳过慢的；换镜像先跑
+ *  scripts/probe-update-mirrors.mjs 验证 */
+export const MIRRORS = ['https://gh-proxy.com/', 'https://ghproxy.net/']
 
 export interface ReleaseAsset {
   name: string
@@ -69,22 +71,31 @@ async function fetchLatestViaApi(): Promise<ReleaseInfo> {
   return { releaseUrl: String(data.html_url || RELEASES_PAGE), assets }
 }
 
-/** API 被墙时的兜底：镜像抓 latest 跳转页拿 tag，再抓 expanded_assets 页拿资产文件名（拿不到大小） */
+/** API 被墙时的兜底：镜像抓 latest 跳转页拿 tag，再抓 expanded_assets 页拿资产文件名（拿不到大小）。
+ *  多个镜像依序试：有的镜像页面代理坏（返回混淆页/500），有的好，谁的页面里能抠出 tag 用谁 */
 async function fetchLatestViaPage(): Promise<ReleaseInfo> {
-  const page = await fetchText(MIRROR + RELEASES_PAGE, 20_000)
-  const tag = /releases\/tag\/(v\d+\.\d+\.\d+)/.exec(page)?.[1]
-  if (!tag) throw new Error('镜像页面里没找到版本号')
-  const list = await fetchText(`${MIRROR}https://github.com/${REPO}/releases/expanded_assets/${tag}`, 20_000)
-  const assets: ReleaseAsset[] = []
-  const seen = new Set<string>()
-  const re = new RegExp(`releases/download/${tag}/([A-Za-z0-9._-]+)`, 'g')
-  for (const match of list.matchAll(re)) {
-    const name = match[1]
-    if (seen.has(name)) continue
-    seen.add(name)
-    assets.push({ name, url: `https://github.com/${REPO}/releases/download/${tag}/${name}`, size: 0 })
+  let lastError: unknown = null
+  for (const mirror of MIRRORS) {
+    try {
+      const page = await fetchText(mirror + RELEASES_PAGE, 20_000)
+      const tag = /releases\/tag\/(v\d+\.\d+\.\d+)/.exec(page)?.[1]
+      if (!tag) throw new Error('镜像页面里没找到版本号')
+      const list = await fetchText(`${mirror}https://github.com/${REPO}/releases/expanded_assets/${tag}`, 20_000)
+      const assets: ReleaseAsset[] = []
+      const seen = new Set<string>()
+      const re = new RegExp(`releases/download/${tag}/([A-Za-z0-9._-]+)`, 'g')
+      for (const match of list.matchAll(re)) {
+        const name = match[1]
+        if (seen.has(name)) continue
+        seen.add(name)
+        assets.push({ name, url: `https://github.com/${REPO}/releases/download/${tag}/${name}`, size: 0 })
+      }
+      return { releaseUrl: `https://github.com/${REPO}/releases/tag/${tag}`, assets }
+    } catch (error) {
+      lastError = error
+    }
   }
-  return { releaseUrl: `https://github.com/${REPO}/releases/tag/${tag}`, assets }
+  throw lastError instanceof Error ? lastError : new Error('所有镜像的页面兜底都不可用')
 }
 
 export async function fetchLatestRelease(): Promise<{ ok: boolean; info: ReleaseInfo | null; viaMirror: boolean; error?: string }> {
@@ -223,7 +234,7 @@ export async function downloadLatestInstaller(sender: WebContents): Promise<Upda
   const target = join(dir, info.assetName!)
   const attempts = [
     { url: info.downloadUrl, viaMirror: false },
-    { url: MIRROR + info.downloadUrl, viaMirror: true }
+    ...MIRRORS.map((mirror) => ({ url: mirror + info.downloadUrl, viaMirror: true }))
   ]
   let lastError: unknown = null
   for (const attempt of attempts) {
@@ -295,8 +306,8 @@ export async function installDownloadedInstaller(): Promise<UpdateDownloadResult
   return { ok: true, path: installer }
 }
 
-/** 打开 Releases 页面（只放行我们自己的两个域，别当通用 openURL 用） */
+/** 打开 Releases 页面（只放行我们自己的几个域，别当通用 openURL 用） */
 export function openReleasePage(url: string): void {
-  const target = /^https:\/\/(github\.com|ghproxy\.net)\//.test(url) ? url : RELEASES_PAGE
+  const target = /^https:\/\/(github\.com|gh-proxy\.com|ghproxy\.net)\//.test(url) ? url : RELEASES_PAGE
   void shell.openExternal(target)
 }

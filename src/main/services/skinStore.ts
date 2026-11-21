@@ -5,7 +5,7 @@ import { createReadStream, existsSync, readdirSync, readFileSync, writeFileSync,
 import { join } from 'path'
 import type { SkinDownloadResult, SkinMeta, SkinPackageInfo } from '../../shared/types'
 import { assetRoot, userSkinsRoot } from './store'
-import { compareVersions, fetchLatestRelease, MIRROR, streamToFile, type ReleaseAsset } from './updater'
+import { compareVersions, fetchLatestRelease, MIRRORS, streamToFile, type ReleaseAsset } from './updater'
 
 /** 角色包资产命名约定：skin-<皮肤id>-<版本>.zip（pack-skins.mjs 产出）+ 同名 .sha256 sidecar */
 const SKIN_ASSET_RE = /skin-([a-z0-9-]+)-(\d+\.\d+\.\d+)\.zip/
@@ -96,9 +96,9 @@ function sha256File(path: string): Promise<string> {
   })
 }
 
-/** sidecar 是 "<64位hex>  <文件名>" 一行文本；直连拿不到自动换镜像 */
+/** sidecar 是 "<64位hex>  <文件名>" 一行文本；直连拿不到自动逐个换镜像 */
 async function fetchExpectedSha256(sidecarUrl: string): Promise<string | null> {
-  for (const url of [sidecarUrl, MIRROR + sidecarUrl]) {
+  for (const url of [sidecarUrl, ...MIRRORS.map((mirror) => mirror + sidecarUrl)]) {
     try {
       const response = await net.fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(15_000) })
       if (!response.ok) continue
@@ -153,7 +153,7 @@ export async function downloadSkin(id: string, sender: import('electron').WebCon
   const zipPath = join(staging, `skin-${id}-${pkg.version}.zip`)
   const attempts = [
     { url: pkg.downloadUrl, viaMirror: false },
-    { url: MIRROR + pkg.downloadUrl, viaMirror: true }
+    ...MIRRORS.map((mirror) => ({ url: mirror + pkg.downloadUrl, viaMirror: true }))
   ]
   let lastError: unknown = null
   for (const attempt of attempts) {
