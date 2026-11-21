@@ -195,9 +195,46 @@ export async function downloadSkin(id: string, sender: import('electron').WebCon
       lastError = (error as Error).message === 'SLOW_CHANNEL' ? new Error('SLOW_CHANNEL') : error
     }
   }
+  // 保底：直连和镜像都被测速掐断 → 回直连关掉测速慢慢下完（慢速完成也总比拿不到强）
+  if (lastError instanceof Error && lastError.message === 'SLOW_CHANNEL') {
+    const controller = new AbortController()
+    activeSkinDownload = controller
+    try {
+      await streamToFile(pkg.downloadUrl, zipPath, controller, (progress) => {
+        if (!sender.isDestroyed()) sender.send('skin:progress', { id, received: progress.received, total: progress.total || pkg.size })
+      }, { speedWatch: false })
+      const expected = await fetchExpectedSha256(pkg.downloadUrl.replace(/\.zip$/, '.zip.sha256'))
+      if (expected) {
+        const actual = await sha256File(zipPath)
+        if (actual !== expected) throw new Error('校验和不匹配（下载损坏），请稍后再试')
+      }
+      const extractDir = join(staging, `${id}-${pkg.version}`)
+      rmSync(extractDir, { recursive: true, force: true })
+      mkdirSync(extractDir, { recursive: true })
+      await runTar(['-xf', zipPath, '-C', extractDir])
+      const extractedDir = join(extractDir, id)
+      if (!existsSync(join(extractedDir, 'skin.json'))) throw new Error('解压后没找到 skin.json（包内容不对）')
+      patchSkinVersion(extractedDir, pkg.version)
+      const target = join(userSkinsRoot(), id)
+      if (!existsSync(target)) {
+        renameDir(join(extractDir, id), target)
+        rmSync(extractDir, { recursive: true, force: true })
+        cleanupStaging(staging, id)
+        return { ok: true, applied: true, viaMirror: false }
+      }
+      return { ok: true, applied: false, pendingRestart: true, viaMirror: false }
+    } catch (error) {
+      if (skinCancelRequested) {
+        skinCancelRequested = false
+        activeSkinDownload = null
+        return { ok: false, error: '已取消下载' }
+      }
+      lastError = error
+    }
+  }
   activeSkinDownload = null
   const reason = lastError instanceof Error ? lastError.message : '网络异常'
-  return { ok: false, error: `下载失败：${reason === 'SLOW_CHANNEL' ? '直连和镜像速度都不理想，请稍后再试' : reason}` }
+  return { ok: false, error: `下载失败：${reason === 'SLOW_CHANNEL' ? '网络状况不佳，请稍后再试' : reason}` }
 }
 
 /** userData 里同盘 rename 一般都能成；兜底走复制删除 */

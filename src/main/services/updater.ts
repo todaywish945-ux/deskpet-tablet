@@ -155,7 +155,8 @@ export async function streamToFile(
   url: string,
   target: string,
   controller: AbortController,
-  onProgress: (progress: DownloadProgress) => void
+  onProgress: (progress: DownloadProgress) => void,
+  opts?: { speedWatch?: boolean }
 ): Promise<number> {
   let lastByteAt = Date.now()
   const stallTimer = setInterval(() => {
@@ -177,7 +178,7 @@ export async function streamToFile(
       onProgress({ received, total })
     }
     const elapsed = now - startedAt
-    if (!slowFlag && elapsed > SPEED_GRACE_MS && received / (elapsed / 1000) < SLOW_SPEED_BPS) {
+    if ((!opts || opts.speedWatch !== false) && !slowFlag && elapsed > SPEED_GRACE_MS && received / (elapsed / 1000) < SLOW_SPEED_BPS) {
       slowFlag = true
       controller.abort()
     }
@@ -240,13 +241,32 @@ export async function downloadLatestInstaller(sender: WebContents): Promise<Upda
         cancelRequested = false
         return { ok: false, error: '已取消下载' }
       }
-      // 测速掐断（SLOW_CHANNEL）：换下一线路静默重试；两路都慢才落到失败文案
+      // 测速掐断（SLOW_CHANNEL）：换下一线路静默重试；两路都慢才落到保底段
       lastError = (error as Error).message === 'SLOW_CHANNEL' ? new Error('SLOW_CHANNEL') : error
+    }
+  }
+  // 保底：直连和镜像都被测速掐断 → 回直连关掉测速慢慢下完（慢速完成也总比拿不到强）
+  if (lastError instanceof Error && lastError.message === 'SLOW_CHANNEL') {
+    const controller = new AbortController()
+    activeDownload = controller
+    try {
+      const received = await streamToFile(info.downloadUrl, target, controller, (progress) => {
+        if (!sender.isDestroyed()) sender.send('update:progress', progress)
+      }, { speedWatch: false })
+      if (info.size && received < info.size) throw new Error(`下载不完整（${received}/${info.size} 字节）`)
+      downloadedInstallerPath = target
+      return { ok: true, path: target, viaMirror: false }
+    } catch (error) {
+      if (cancelRequested) {
+        cancelRequested = false
+        return { ok: false, error: '已取消下载' }
+      }
+      lastError = error
     }
   }
   activeDownload = null
   const reason = lastError instanceof Error ? lastError.message : '网络异常'
-  return { ok: false, error: `下载失败：${reason === 'SLOW_CHANNEL' ? '直连和镜像速度都不理想，请稍后再试' : reason}` }
+  return { ok: false, error: `下载失败：${reason === 'SLOW_CHANNEL' ? '网络状况不佳，请稍后再试' : reason}` }
 }
 
 export function cancelDownload(): void {
