@@ -103,6 +103,13 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   onUpdateProgress: (callback: (progress: { received: number; total: number }) => void) => {
     ipcRenderer.on('update:progress', (_event, progress) => callback(progress))
   },
+  /** 应用内下载角色：可用列表 / 下载（进度走 onSkinProgress）/ 取消 */
+  availableSkins: () => ipcRenderer.invoke('skins:available'),
+  downloadSkin: (id: string) => ipcRenderer.invoke('skins:download', id),
+  cancelSkinDownload: () => ipcRenderer.invoke('skins:cancel-download'),
+  onSkinProgress: (callback: (progress: { id: string; received: number; total: number }) => void) => {
+    ipcRenderer.on('skin:progress', (_event, progress) => callback(progress))
+  },
   openPet: () => ipcRenderer.invoke('app:toggle-pet'),
   quit: () => ipcRenderer.invoke('app:quit')
 })

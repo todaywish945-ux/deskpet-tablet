@@ -1,4 +1,4 @@
-import type { AppConfig, ChatSession, SessionStore, UserProfile, UpdateCheckResult, UpdateDownloadResult } from '../../shared/types'
+import type { AppConfig, ChatSession, SessionStore, UserProfile, UpdateCheckResult, UpdateDownloadResult, SkinStoreResult, SkinDownloadResult } from '../../shared/types'
 
 declare global {
   interface Window {
@@ -60,6 +60,10 @@ declare global {
       installUpdate: () => Promise<UpdateDownloadResult>
       openReleasePage: (url: string) => Promise<void>
       onUpdateProgress: (callback: (progress: { received: number; total: number }) => void) => void
+      availableSkins: () => Promise<SkinStoreResult>
+      downloadSkin: (id: string) => Promise<SkinDownloadResult>
+      cancelSkinDownload: () => Promise<boolean>
+      onSkinProgress: (callback: (progress: { id: string; received: number; total: number }) => void) => void
       openPet: () => Promise<void>
       quit: () => Promise<void>
     }

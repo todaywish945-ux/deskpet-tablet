@@ -9,5 +9,6 @@
   "wallpaper": "wallpapers/dual-form-wallpaper-muted.png",
   "tray": "stickers/22-red-daily-listening.png",
   "persona": "prompts/character.md",
-  "emotions": {}
+  "emotions": {},
+  "version": "1.0.0"
 }

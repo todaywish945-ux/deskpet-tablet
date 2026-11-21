@@ -89,6 +89,10 @@ export interface SkinMeta {
   persona: string
   /** 情绪 → 表达（live2d=表情名）或动画文件（video 后端走 manifest，此字段可空） */
   emotions?: Record<string, string>
+  /** 皮肤包版本（应用内下载/更新对比用；打包脚本写入 skin.json） */
+  version?: string
+  /** true=不作为角色出现在任何列表（模板空壳兜底专用） */
+  hidden?: boolean
 }
 
 export interface AppConfig {
@@ -244,5 +248,39 @@ export interface UpdateDownloadResult {
   ok: boolean
   path?: string
   viaMirror?: boolean
+  error?: string
+}
+
+// ---------- 应用内下载角色（皮肤包，主进程 skinStore 服务与渲染层共用） ----------
+
+export interface SkinPackageInfo {
+  id: string
+  /** 皮肤包版本（zip 文件名里的版本号） */
+  version: string
+  /** zip 下载直连地址 */
+  downloadUrl: string
+  /** 字节数；镜像/页面兜底通道拿不到时为 0 */
+  size: number
+  /** 本机已装的版本（内置或下载装过）；null=未安装 */
+  installedVersion: string | null
+  /** 已装的皮肤显示名（未安装时 null） */
+  installedName: string | null
+  /** 已装版本比包旧 = true */
+  hasUpdate: boolean
+}
+
+export interface SkinDownloadResult {
+  ok: boolean
+  /** 新装 = 立即可用；替换旧版 = 重启应用后生效 */
+  applied?: boolean
+  pendingRestart?: boolean
+  viaMirror?: boolean
+  error?: string
+}
+
+export interface SkinStoreResult {
+  ok: boolean
+  skins: SkinPackageInfo[]
+  viaMirror: boolean
   error?: string
 }

@@ -1,6 +1,7 @@
 {
   "id": "template",
   "name": "模板皮肤",
+  "hidden": true,
   "backend": "video",
   "manifest": "animations/manifest.json",
   "loopPoints": "animations/loop-points.json",

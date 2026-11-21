@@ -1,4 +1,4 @@
-import type { AppConfig, TTSProvider, PetLayerMode } from '../../shared/types'
+import type { AppConfig, TTSProvider, PetLayerMode, SkinPackageInfo, SkinStoreResult } from '../../shared/types'
 
 const api = window.settingsAPI
 
@@ -353,6 +353,90 @@ updateOpenBtn.addEventListener('click', () => {
   void api.openReleasePage(lastReleaseUrl)
 })
 
+// ---------- 角色下载商店 ----------
+
+const skinStoreEl = $<HTMLDivElement>('skin-store')
+const skinStoreStatus = $<HTMLParagraphElement>('skin-store-status')
+
+function setSkinStoreStatus(text: string, isError = false): void {
+  skinStoreStatus.textContent = text
+  skinStoreStatus.classList.toggle('err', isError)
+}
+
+function skinRowLabel(pkg: SkinPackageInfo): string {
+  const name = pkg.installedName ?? pkg.id
+  const size = pkg.size > 0 ? `（${(pkg.size / 1024 / 1024).toFixed(0)}MB）` : ''
+  const state = !pkg.installedVersion ? '未安装' : pkg.hasUpdate ? `已装 v${pkg.installedVersion}，可更新` : `已装 v${pkg.installedVersion}`
+  return `${name} · 包 v${pkg.version}${size} · ${state}`
+}
+
+function setSkinRowProgress(id: string, text: string): void {
+  const el = document.getElementById(`skin-dl-${id}`)
+  if (el) el.textContent = text
+}
+
+async function renderSkinStore(): Promise<void> {
+  skinStoreEl.innerHTML = ''
+  let result: SkinStoreResult
+  try {
+    result = await api.availableSkins()
+  } catch (error) {
+    setSkinStoreStatus(`角色列表获取失败：${(error as Error).message}`, true)
+    return
+  }
+  if (!result.ok) {
+    setSkinStoreStatus(`角色列表获取失败：${result.error ?? '连不上 GitHub'}。可以稍后再试，不影响已装角色使用。`, true)
+    return
+  }
+  setSkinStoreStatus(result.skins.length ? '点「下载」装到本机；装完在上方下拉里选择使用。' : '最新发布里没有角色包。')
+  for (const pkg of result.skins) {
+    const row = document.createElement('div')
+    row.className = 'actions'
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.id = `skin-dl-btn-${pkg.id}`
+    btn.textContent = pkg.installedVersion && !pkg.hasUpdate ? '重新下载' : pkg.installedVersion ? '更新' : '下载'
+    const label = document.createElement('span')
+    label.className = 'hint'
+    label.id = `skin-dl-${pkg.id}`
+    label.textContent = skinRowLabel(pkg)
+    row.appendChild(btn)
+    row.appendChild(label)
+    skinStoreEl.appendChild(row)
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true
+      btn.textContent = '下载中…'
+      const stop = (finalText: string): void => {
+        btn.disabled = false
+        btn.textContent = pkg.installedVersion && !pkg.hasUpdate ? '重新下载' : pkg.installedVersion ? '更新' : '下载'
+        setSkinRowProgress(pkg.id, finalText)
+      }
+      try {
+        const result = await api.downloadSkin(pkg.id)
+        if (result.ok && result.applied) {
+          stop('已装好 ✓ 上方下拉选择即可使用')
+          await fillSkinOptions(config?.character.skin)
+          await renderSkinStore()
+        } else if (result.ok && result.pendingRestart) {
+          stop('已下载 ✓ 完全退出并重新打开应用后替换旧版')
+        } else if (result.error === '已取消下载') {
+          stop('已取消')
+        } else {
+          stop(`失败：${result.error ?? ''}（可重试）`)
+        }
+      } catch (error) {
+        stop(`失败：${(error as Error).message}`)
+      }
+    })
+  }
+}
+
+api.onSkinProgress(({ id, received, total }) => {
+  const pkgText = total > 0 ? `${(received / 1024 / 1024).toFixed(1)} / ${(total / 1024 / 1024).toFixed(1)} MB（${Math.min(100, Math.round((received / total) * 100))}%）` : `已下载 ${(received / 1024 / 1024).toFixed(1)} MB…`
+  setSkinRowProgress(id, `下载中 ${pkgText}`)
+})
+
 void (async () => {
   config = await api.getConfig()
   fillForm(config!)
@@ -360,4 +444,5 @@ void (async () => {
     updateCurrent.textContent = `v${version}`
   })
   void runUpdateCheck(false) // 打开设置页时静默预检一次，失败不打扰
+  void renderSkinStore()
 })()

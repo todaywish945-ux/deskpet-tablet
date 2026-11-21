@@ -32,6 +32,7 @@ import { runTurn, cancelActiveTurn } from './services/chatPipeline'
 import { loadProfile, deleteFact } from './services/profile'
 import { enrollVoice } from './services/enrollment'
 import { checkForUpdate, downloadLatestInstaller, installDownloadedInstaller, cancelDownload, openReleasePage } from './services/updater'
+import { availableSkins, downloadSkin, cancelSkinDownload } from './services/skinStore'
 import { synthesizeWav } from './services/tts'
 
 export function registerIpc(): void {
@@ -274,6 +275,16 @@ export function registerIpc(): void {
   })
   ipcMain.handle('update:install', () => installDownloadedInstaller())
   ipcMain.handle('update:open-page', (_event, url: string) => openReleasePage(url))
+
+  // ---------- 应用内下载角色（皮肤包） ----------
+
+  ipcMain.handle('skins:available', () => availableSkins())
+  // 下载在主进程流式跑，进度经 event.sender 推给发起请求的设置窗口
+  ipcMain.handle('skins:download', (event, id: string) => downloadSkin(id, event.sender))
+  ipcMain.handle('skins:cancel-download', () => {
+    cancelSkinDownload()
+    return true
+  })
 
   // ---------- 启动常驻服务 ----------
 

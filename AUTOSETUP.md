@@ -74,9 +74,9 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 
 【阶段 1 · 下载并安装】
 1. 下载安装包到下载文件夹：
-   主链接 https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.2.2/qiaoqiao-setup-0.1.2.exe
-   （文件名 qiaoqiao-setup-0.1.2.exe；链接失效就去 Releases 页面下载最新安装包）
-   下载失败或太慢就换镜像：在完整链接前面加 https://gh-proxy.com/ 前缀再下。
+   主链接 https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.2.3/qiaoqiao-setup-0.1.3.exe
+   （文件名 qiaoqiao-setup-0.1.3.exe；链接失效就去 Releases 页面下载最新安装包。安装包不带角色，装好后要在 设置 → 角色皮肤 里下载角色包）
+   下载失败或太慢就换镜像：在完整链接前面加 https://ghproxy.net/ 前缀再下。
 2. 静默安装：运行安装包并加参数 /S；或启动向导让我点完。
 3. 从桌面/开始菜单的「敲敲」快捷方式启动（如果装的是旧版，快捷方式叫「叶瞬光桌宠」）。
 验收：安装目录存在主程序 exe（敲敲.exe），进程在运行；访问 http://127.0.0.1:37820/health 返回 JSON

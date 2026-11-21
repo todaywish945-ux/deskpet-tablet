@@ -170,6 +170,7 @@ export function listSkins(): SkinMeta[] {
         const file = join(root, entry.name, 'skin.json')
         if (!existsSync(file)) continue
         const meta = JSON.parse(readFileSync(file, 'utf-8')) as SkinMeta
+        if (meta.hidden) continue // 模板空壳等兜底皮肤不作为角色出现
         if (meta.id && meta.backend) out.set(meta.id, meta) // userData 后扫，覆盖同名
       }
     } catch {

@@ -10,6 +10,7 @@ import { createSettingsWindow } from './settingsWindow'
 import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
 import { assetRoot, activeSkinDir, loadConfig } from './services/store'
 import { warmUpGsv } from './services/gsv'
+import { processStagedSkinInstalls } from './services/skinStore'
 
 // 产品名已改为「敲敲」：数据目录沿用旧名，历史配置/会话/记忆（含 API Key）原地保留，
 // 绝不能因为改名搬到新目录——一搬就等于用户数据全丢。
@@ -131,6 +132,9 @@ if (!gotLock) {
     session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
       callback(permission === 'media')
     })
+
+    // 上次下载的角色包如果走了"重启替换"，在窗口创建前就位（此刻绝无播放器文件锁）
+    processStagedSkinInstalls()
 
     protocol.handle('petasset', (request) => serveAsset(request.url, request))
 
