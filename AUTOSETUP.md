@@ -39,7 +39,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 参考音频：<完整路径，单人清晰人声；bailian 建议 ≥10 秒 / gptsovits 需 3~10 秒；没有写「无」= 暂时文字聊天>
 GPT-SoVITS 整合包目录：<仅 gptsovits 时填；纯英文路径，整合包需自己提前下载解压>
 人设文件：<可选，.md 文本路径；没有写「无」= 用内置通用人设「阿板」，开箱就能聊>
-素材文件夹：<可选，你自己的头像/动画/贴纸文件夹；没有写「无」= 用内置叶瞬光皮肤（开箱即完整形态，人设与语音参考都自带）>
+素材文件夹：<可选，你自己的头像/动画/贴纸文件夹；没有写「无」= 装好后应用内 设置 → 角色皮肤 里下载「叶瞬光」角色包（人设与语音参考随包自带）>
 ```
 
 > **分享给别人时**：把【框架下载地址】预填为固定直链
@@ -73,12 +73,15 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 已存在则跳过 status=done 的阶段从断点继续，绝不重做。每完成/失败一个阶段立即更新它。
 
 【阶段 1 · 下载并安装】
-1. 下载安装包到下载文件夹：
-   主链接 https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.2.3/qiaoqiao-setup-0.1.3.exe
-   （文件名 qiaoqiao-setup-0.1.3.exe；链接失效就去 Releases 页面下载最新安装包。安装包不带角色，装好后要在 设置 → 角色皮肤 里下载角色包）
-   下载失败或太慢就换镜像：在完整链接前面加 https://ghproxy.net/ 前缀再下。
+1. 下载安装包到下载文件夹（约 87MB，三个链接是同一个文件，按顺序试，哪个通用哪个）：
+   主链接（国内加速，快） https://gh-proxy.com/https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.2.3/qiaoqiao-setup-0.1.3.exe
+   备用（直连） https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.2.3/qiaoqiao-setup-0.1.3.exe
+   再备用（另一个镜像） https://ghproxy.net/https://github.com/todaywish945-ux/deskpet-tablet/releases/download/v1.2.3/qiaoqiao-setup-0.1.3.exe
+   （安装包不带角色；链接失效就去 Releases 页面下载最新安装包）
 2. 静默安装：运行安装包并加参数 /S；或启动向导让我点完。
 3. 从桌面/开始菜单的「敲敲」快捷方式启动（如果装的是旧版，快捷方式叫「叶瞬光桌宠」）。
+4. 下载角色：打开「设置」→「角色皮肤」→ 点「下载」装上「叶瞬光」（约 199MB，应用自动选最快线路，不用手动换镜像），
+   装完在下拉里选中她 → 点一次「保存设置」。
 验收：安装目录存在主程序 exe（敲敲.exe），进程在运行；访问 http://127.0.0.1:37820/health 返回 JSON
 且 app 字段为 ye-shunguang-deskpet（以实际返回为准；不通就等 10 秒重试 3 次）。
 连续失败 2 次（含换镜像重试）→ 停下把输出贴给我。
