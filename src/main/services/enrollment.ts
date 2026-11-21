@@ -57,6 +57,9 @@ export async function enrollVoice(config: TTSConfig, assetRoot: string, namePref
   if (!config.apiKey) throw new TTSError('请先填写百炼 API Key。')
   if (!config.model) throw new TTSError('请先选择语音模型。')
 
+  // 百炼 create_voice 的 prefix 用作音色 ID 前缀，限 ≤10 字符且仅小写字母数字，
+  // 超长直接 InvalidParameter（默认皮肤 id "yeshunguang" 恰好 11 个字母，必撞）
+  const prefix = namePrefix.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 10) || 'voice'
   const reference = readFileSync(join(assetRoot, 'voice', 'reference.mp3'))
   const policy = await getUploadPolicy(config.apiKey)
   const ossUrl = await uploadReference(policy, reference)
@@ -72,7 +75,7 @@ export async function enrollVoice(config: TTSConfig, assetRoot: string, namePref
       input: {
         action: 'create_voice',
         target_model: config.model,
-        prefix: namePrefix,
+        prefix,
         url: ossUrl,
         language_hints: ['zh']
       }
