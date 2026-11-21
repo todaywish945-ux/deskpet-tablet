@@ -232,7 +232,132 @@ saveBtn.addEventListener('click', async () => {
   }
 })
 
+// ---------- 软件更新 ----------
+
+const updateCurrent = $<HTMLSpanElement>('update-current')
+const updateCheckBtn = $<HTMLButtonElement>('update-check-btn')
+const updateOpenBtn = $<HTMLButtonElement>('update-open-btn')
+const updateProgressRow = $<HTMLDivElement>('update-progress-row')
+const updateProgress = $<HTMLProgressElement>('update-progress')
+const updateProgressText = $<HTMLSpanElement>('update-progress-text')
+const updateCancelBtn = $<HTMLButtonElement>('update-cancel-btn')
+const updateInstallRow = $<HTMLDivElement>('update-install-row')
+const updateInstallBtn = $<HTMLButtonElement>('update-install-btn')
+const updateStatus = $<HTMLParagraphElement>('update-status')
+
+let lastReleaseUrl = ''
+
+function setUpdateStatus(text: string, isError = false): void {
+  updateStatus.textContent = text
+  updateStatus.classList.toggle('err', isError)
+}
+
+function mb(bytes: number): string {
+  return (bytes / 1024 / 1024).toFixed(1)
+}
+
+api.onUpdateProgress(({ received, total }) => {
+  if (total > 0) {
+    const percent = Math.min(100, Math.round((received / total) * 100))
+    updateProgress.value = percent
+    updateProgressText.textContent = `${mb(received)} / ${mb(total)} MB（${percent}%）`
+  } else {
+    updateProgressText.textContent = `已下载 ${mb(received)} MB…`
+  }
+})
+
+/** notifyOnError=false 用于设置页打开时的静默预检（失败不打扰） */
+async function runUpdateCheck(notifyOnError: boolean): Promise<void> {
+  try {
+    const info = await api.checkUpdate()
+    updateCurrent.textContent = `v${info.currentVersion}`
+    lastReleaseUrl = info.releaseUrl
+    updateOpenBtn.hidden = false
+    if (!info.ok) {
+      if (notifyOnError) setUpdateStatus(`检查失败：${info.error ?? '连不上 GitHub'}。可以点「打开下载页」手动看看。`, true)
+      return
+    }
+    if (info.hasUpdate && info.downloadUrl) {
+      setUpdateStatus(`发现新版本 v${info.version}（当前 v${info.currentVersion}），点「下载更新」开始下载${info.viaMirror ? '（经镜像）' : ''}`)
+      updateCheckBtn.textContent = '下载更新'
+      updateCheckBtn.dataset.mode = 'download'
+    } else if (info.version) {
+      setUpdateStatus(`已是最新版本（v${info.currentVersion}）`)
+    } else {
+      setUpdateStatus('最新发布里没有认出安装包，请到下载页手动查看', true)
+    }
+  } catch (error) {
+    if (notifyOnError) setUpdateStatus(`检查失败：${(error as Error).message}`, true)
+  }
+}
+
+updateCheckBtn.addEventListener('click', async () => {
+  if (updateCheckBtn.dataset.mode === 'download') {
+    updateCheckBtn.disabled = true
+    updateProgressRow.hidden = false
+    updateProgress.value = 0
+    updateProgressText.textContent = '连接中…'
+    try {
+      const result = await api.downloadUpdate()
+      updateProgressRow.hidden = true
+      if (result.ok) {
+        updateInstallRow.hidden = false
+        setUpdateStatus(`下载完成 ✓ 点「立即安装并重启」升级${result.viaMirror ? '（经镜像）' : ''}`)
+      } else if (result.error === '已取消下载') {
+        setUpdateStatus('已取消下载')
+      } else {
+        setUpdateStatus(`下载失败：${result.error ?? ''}。可重试，或点「打开下载页」手动下载。`, true)
+      }
+      updateCheckBtn.dataset.mode = 'check'
+      updateCheckBtn.textContent = '重新检查'
+    } catch (error) {
+      updateProgressRow.hidden = true
+      setUpdateStatus(`下载失败：${(error as Error).message}`, true)
+      updateCheckBtn.dataset.mode = 'check'
+      updateCheckBtn.textContent = '重新检查'
+    } finally {
+      updateCheckBtn.disabled = false
+    }
+    return
+  }
+  updateCheckBtn.disabled = true
+  updateCheckBtn.textContent = '检查中…'
+  await runUpdateCheck(true)
+  updateCheckBtn.disabled = false
+  if (updateCheckBtn.textContent === '检查中…') updateCheckBtn.textContent = '检查更新'
+})
+
+updateCancelBtn.addEventListener('click', () => {
+  void api.cancelUpdateDownload()
+})
+
+updateInstallBtn.addEventListener('click', async () => {
+  updateInstallBtn.disabled = true
+  updateInstallBtn.textContent = '正在启动安装器…'
+  try {
+    const result = await api.installUpdate()
+    if (!result.ok) {
+      setUpdateStatus(`启动失败：${result.error ?? ''}`, true)
+      updateInstallBtn.disabled = false
+      updateInstallBtn.textContent = '立即安装并重启'
+    }
+    // 成功时主进程会 app.quit()，页面随窗口一起关闭
+  } catch (error) {
+    setUpdateStatus(`启动失败：${(error as Error).message}`, true)
+    updateInstallBtn.disabled = false
+    updateInstallBtn.textContent = '立即安装并重启'
+  }
+})
+
+updateOpenBtn.addEventListener('click', () => {
+  void api.openReleasePage(lastReleaseUrl)
+})
+
 void (async () => {
   config = await api.getConfig()
   fillForm(config!)
+  void api.getVersion().then((version) => {
+    updateCurrent.textContent = `v${version}`
+  })
+  void runUpdateCheck(false) // 打开设置页时静默预检一次，失败不打扰
 })()

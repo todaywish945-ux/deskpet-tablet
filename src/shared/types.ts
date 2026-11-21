@@ -221,3 +221,28 @@ export type Emotion = (typeof EMOTIONS)[number]
 // 情绪标签：标准 [emotion:xxx]，模型偶尔偷懒写成 [xxx]——两种都认（剥离时校验名字合法）
 /** 情绪标签：全角/半角冒号都认（模型偶尔输出 [emotion：curious]，不匹配会原样漏进气泡） */
 export const EMOTION_TAG_RE = /\[emotion[：:]([a-z_]+)\]/g
+
+// ---------- 软件更新（设置页「检查更新」，主进程 updater 服务与渲染层共用） ----------
+
+export interface UpdateCheckResult {
+  /** false = GitHub 直连和镜像都没连上 */
+  ok: boolean
+  currentVersion: string
+  /** 安装包文件名里的版本（qiaoqiao-setup-0.1.2.exe → 0.1.2）；null = 最新发布里没认出安装包 */
+  version: string | null
+  hasUpdate: boolean
+  releaseUrl: string
+  assetName: string | null
+  downloadUrl: string | null
+  size: number | null
+  /** 结果是经镜像（ghproxy.net）拿到的 */
+  viaMirror: boolean
+  error?: string
+}
+
+export interface UpdateDownloadResult {
+  ok: boolean
+  path?: string
+  viaMirror?: boolean
+  error?: string
+}

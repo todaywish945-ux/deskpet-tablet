@@ -192,3 +192,31 @@ textarea:focus {
 .gsv-status.err {
   color: #ff9d9d;
 }
+
+/* ---------- 软件更新 ---------- */
+
+#update-progress-row {
+  align-items: center;
+}
+
+#update-progress {
+  flex: 1;
+  height: 8px;
+  accent-color: #2fd6bd;
+}
+
+#update-progress-text {
+  white-space: nowrap;
+  font-size: 12px;
+  color: #7d8a99;
+}
+
+#update-status.err {
+  color: #ff7a7a;
+}
+
+/* hidden 属性会被上面 .actions 的 display:flex 盖掉（主界面踩过的同款坑），显式压回来 */
+#update-progress-row[hidden],
+#update-install-row[hidden] {
+  display: none;
+}

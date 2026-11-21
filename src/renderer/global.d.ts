@@ -1,4 +1,4 @@
-import type { AppConfig, ChatSession, SessionStore, UserProfile } from '../../shared/types'
+import type { AppConfig, ChatSession, SessionStore, UserProfile, UpdateCheckResult, UpdateDownloadResult } from '../../shared/types'
 
 declare global {
   interface Window {
@@ -53,6 +53,13 @@ declare global {
       testVoice: (text: string) => Promise<{ wav: string }>
       pickRefAudio: () => Promise<{ path: string }>
       probeGsv: (apiBase: string) => Promise<{ online: boolean; status: number }>
+      getVersion: () => Promise<string>
+      checkUpdate: () => Promise<UpdateCheckResult>
+      downloadUpdate: () => Promise<UpdateDownloadResult>
+      cancelUpdateDownload: () => Promise<boolean>
+      installUpdate: () => Promise<UpdateDownloadResult>
+      openReleasePage: (url: string) => Promise<void>
+      onUpdateProgress: (callback: (progress: { received: number; total: number }) => void) => void
       openPet: () => Promise<void>
       quit: () => Promise<void>
     }

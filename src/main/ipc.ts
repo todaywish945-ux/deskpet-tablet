@@ -31,6 +31,7 @@ import {
 import { runTurn, cancelActiveTurn } from './services/chatPipeline'
 import { loadProfile, deleteFact } from './services/profile'
 import { enrollVoice } from './services/enrollment'
+import { checkForUpdate, downloadLatestInstaller, installDownloadedInstaller, cancelDownload, openReleasePage } from './services/updater'
 import { synthesizeWav } from './services/tts'
 
 export function registerIpc(): void {
@@ -260,6 +261,19 @@ export function registerIpc(): void {
       return { online: false, status: 0 }
     }
   })
+
+  // ---------- 软件更新（设置页「检查更新」） ----------
+
+  ipcMain.handle('app:get-version', () => app.getVersion())
+  ipcMain.handle('update:check', () => checkForUpdate())
+  // 下载在主进程流式跑，进度经 event.sender 推给发起请求的设置窗口
+  ipcMain.handle('update:download', (event) => downloadLatestInstaller(event.sender))
+  ipcMain.handle('update:cancel-download', () => {
+    cancelDownload()
+    return true
+  })
+  ipcMain.handle('update:install', () => installDownloadedInstaller())
+  ipcMain.handle('update:open-page', (_event, url: string) => openReleasePage(url))
 
   // ---------- 启动常驻服务 ----------
 

@@ -93,6 +93,16 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   testVoice: (text: string) => ipcRenderer.invoke('voice:test', text),
   pickRefAudio: () => ipcRenderer.invoke('voice:pick-ref-audio'),
   probeGsv: (apiBase: string) => ipcRenderer.invoke('voice:probe-gsv', apiBase),
+  /** 软件更新：版本号 / 检查 / 下载（进度走 onUpdateProgress）/ 取消 / 静默安装 / 打开下载页 */
+  getVersion: () => ipcRenderer.invoke('app:get-version'),
+  checkUpdate: () => ipcRenderer.invoke('update:check'),
+  downloadUpdate: () => ipcRenderer.invoke('update:download'),
+  cancelUpdateDownload: () => ipcRenderer.invoke('update:cancel-download'),
+  installUpdate: () => ipcRenderer.invoke('update:install'),
+  openReleasePage: (url: string) => ipcRenderer.invoke('update:open-page', url),
+  onUpdateProgress: (callback: (progress: { received: number; total: number }) => void) => {
+    ipcRenderer.on('update:progress', (_event, progress) => callback(progress))
+  },
   openPet: () => ipcRenderer.invoke('app:toggle-pet'),
   quit: () => ipcRenderer.invoke('app:quit')
 })

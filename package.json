@@ -1,6 +1,6 @@
 {
   "name": "ye-shunguang-deskpet",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "敲敲 — 视频通话形态的 AI 桌面陪伴",
   "author": "shunguang",
   "main": "./out/main/index.js",
