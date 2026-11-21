@@ -262,14 +262,16 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 注意：注册脚本只更新语音相关配置字段，是合并写入，不许"修复"它。
 
 【阶段 3 · 素材落位（大多数情况跳过）】
-框架已内置完整皮肤 assets\skins\yeshunguang（叶瞬光，默认启用）及其人设、语音参考。
+想要官方角色（叶瞬光/蕾米埃尔）：不走本阶段，应用内 设置 → 角色皮肤 点「下载」装上并在下拉里选中即可。
 素材文件夹 = 无：什么都不用做，跳过本阶段。
-素材文件夹 ≠ 无（我自己的角色素材）：
-1. 把我的人设 .md 复制覆盖 assets\skins\template\prompts\character.md
+素材文件夹 ≠ 无（我自己的角色素材）：自制皮肤放**用户皮肤目录**（升级/覆盖安装都不会被清掉；
+注意别放 assets\skins\template\——那是隐藏的空壳兜底，放进去不会出现在角色列表里）：
+1. 建目录 %APPDATA%\ye-shunguang-deskpet\skins\<我的皮肤id>\（id 用小写字母数字），
+   把 <框架目录>\assets\skins\template\ 的 skin.json 复制进去当底子，把里面的 id/name 改成自己的；
+2. 按 <框架目录>\ASSET-GUIDE.md 把头像/动画/贴纸放进同一目录，人设 .md 覆盖 prompts\character.md
    （先读一下确认它末尾保留 [emotion:xxx] 情绪协议段，被删了就在我原文件后面补上这一节）；
-2. 按 <框架目录>\ASSET-GUIDE.md 把头像/动画/贴纸放进 assets\skins\template\；
-3. 读 %APPDATA%\ye-shunguang-deskpet\data\config.json，把 character.skin 改为 "template"。
-验收：persona 指向的文件存在；（若放了 manifest）引用文件全部存在；config 已指向对应皮肤。
+3. 完全退出并重新打开应用 → 设置 → 角色皮肤 下拉里出现我的角色 → 选中 → 保存设置。
+验收：skin.json 的 id/name 已改且无 hidden 字段；（若放了 manifest）引用文件全部存在；下拉里能选中我的角色。
 
 【阶段 4 · 启动与冒烟】
 1. 在框架目录用**新窗口**启动 npm run dev（别阻塞你的终端），等 30 秒。
@@ -284,7 +286,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 - 每阶段结果与一句话证据；
 - %APPDATA%\ye-shunguang-deskpet\data\config.json 的 llm/tts/character 三段内容（**Key 打码**）；
 - 试听.wav 路径（如果注册过）；
-- 接下来我要自己做的事：点开听试听效果 / 以后换素材就改 template 目录 / 想打包就执行 npm run dist。
+- 接下来我要自己做的事：点开听试听效果 / 以后换素材就改 %APPDATA%\ye-shunguang-deskpet\skins\ 里我的角色目录 / 想打包就执行 npm run dist。
 
 【引导我拿 Key（仅在 Key=无 且该 Key 影响对应功能时启用）】
 先别直接跳过：用浏览器打开对应注册页（智谱 bigmodel.cn；百炼 bailian.console.aliyun.com），
@@ -307,7 +309,7 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
 - **带我拿 Key**：注册没法替观众做（要手机号），但搭子可以把注册页面直接开到观众面前带到复制那一步——把"不会用电脑"的成本压到跟一次普通网页注册一样
 - **进度文件**：`配置进度.json` 让任何中断都能「继续」续跑，不会重装重复注册
 - **验收门禁**：每阶段硬标准，连败 2 次强制停——防止搭子为"完成"瞎修
-- **默认皮肤即目标**：素材放进 `template` 目录零配置生效；想多皮肤再看 [PROMPTS-FOR-DUMATE.md](PROMPTS-FOR-DUMATE.md) 卡3
+- **官方角色应用内下载**：叶瞬光/蕾米埃尔在 设置 → 角色皮肤 一键下载（自动选最快线路）；自制角色素材放 `%APPDATA%\ye-shunguang-deskpet\skins\<id>\` 零配置生效；想多皮肤再看 [PROMPTS-FOR-DUMATE.md](PROMPTS-FOR-DUMATE.md) 卡3
 - **模型选择做成菜单**：4 家国内厂商 + 自备 Key，一共 6 个选项发给观众自己选，选完按对应附录一步一步走；不想选的默认智谱免费档
 - **程序化冒烟**：`/health` 接口让它不靠截图判断应用死活
 
