@@ -42,6 +42,8 @@ export interface TTSConfig {
   gsvTextLang: string
   /** 本地语音服务启动脚本（不填用整合包默认路径） */
   gsvLauncherPath?: string
+  /** GPT-SoVITS 推理配置绝对路径（不填用整合包共享配置） */
+  gsvConfigPath?: string
 }
 
 /** 她主动开口（闲置关心 / 早安晚安 / 周回顾） */
@@ -87,6 +89,16 @@ export interface SkinMeta {
   wallpaper?: string
   tray?: string
   persona: string
+  /** 专属本地音色：音频和推理配置均为皮肤内相对路径，不允许指定启动器 */
+  voice?: {
+    provider: 'gptsovits'
+    apiBase: string
+    refAudio: string
+    refText: string
+    inferConfig: string
+    promptLang?: string
+    textLang?: string
+  }
   /** 情绪 → 表达（live2d=表情名）或动画文件（video 后端走 manifest，此字段可空） */
   emotions?: Record<string, string>
   /** 皮肤包版本（应用内下载/更新对比用；打包脚本写入 skin.json） */
@@ -127,6 +139,8 @@ export interface ChatSession {
   createdAt: number
   updatedAt: number
   messages: ChatMessage[]
+  /** 会话归属的皮肤/角色 id（旧数据由 loadSessions 回填当前皮肤） */
+  characterId?: string
 }
 
 export interface SessionStore {
@@ -239,7 +253,7 @@ export interface UpdateCheckResult {
   assetName: string | null
   downloadUrl: string | null
   size: number | null
-  /** 结果是经镜像（ghproxy.net）拿到的 */
+  /** 结果是经镜像（gh-proxy）拿到的 */
   viaMirror: boolean
   error?: string
 }

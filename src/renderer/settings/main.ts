@@ -50,6 +50,7 @@ async function fillSkinOptions(active?: string): Promise<void> {
     for (const s of skins) {
       const opt = document.createElement('option')
       opt.value = s.id
+      opt.dataset.name = s.name
       opt.textContent = s.name + (s.backend === 'live2d' ? '（Live2D）' : '')
       fields.skinSelect.appendChild(opt)
     }
@@ -127,6 +128,7 @@ function collectConfig(): AppConfig {
       autoStart: fields.appAutoStart.checked
     },
     tts: {
+      ...config.tts, // 保留设置页未展示的启动器、推理配置等字段
       enabled: fields.ttsEnabled.checked,
       provider: (fields.ttsProvider.value as TTSProvider) || 'bailian',
       apiKey: fields.ttsKey.value.trim(),
@@ -188,7 +190,8 @@ testBtn.addEventListener('click', async () => {
   try {
     config = collectConfig()
     await api.saveConfig(config)
-    const { wav } = await api.testVoice('你好呀，我是叶瞬光。声音听起来还像吗？')
+    const name = fields.skinSelect.selectedOptions[0]?.dataset.name || '你的伙伴'
+    const { wav } = await api.testVoice(`你好呀，我是${name}。声音听起来还像吗？`)
     const audio = new Audio(`data:audio/wav;base64,${wav}`)
     void audio.play()
     setStatus('试听播放中…')
@@ -196,7 +199,7 @@ testBtn.addEventListener('click', async () => {
     setStatus(`试听失败：${(error as Error).message}`, true)
   } finally {
     testBtn.disabled = false
-    testBtn.textContent = '② 试听'
+    testBtn.textContent = '试听当前角色'
   }
 })
 

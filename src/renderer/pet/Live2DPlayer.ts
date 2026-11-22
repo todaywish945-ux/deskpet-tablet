@@ -43,6 +43,7 @@ export class Live2DPlayer {
   private app: any = null
   private model: PixiLive2DModel | null = null
   private mode: 'loading' | 'ready' | 'failed' = 'loading'
+  private destroyed = false
 
   private talking = false
   private smoothedMouth = 0
@@ -84,6 +85,10 @@ export class Live2DPlayer {
       this.container.appendChild((app as unknown as { view: HTMLCanvasElement }).view)
 
       const model = await PIXI.live2d.Live2DModel.from(`${this.base}/${this.skin.model}`)
+      if (this.destroyed) {
+        model.destroy()
+        return
+      }
       this.model = model
       // 等比缩放居中偏下，占满容器
       const cw = this.container.clientWidth || 600
@@ -127,6 +132,7 @@ export class Live2DPlayer {
   }
 
   private fail(msg: string): void {
+    if (this.destroyed) return
     this.mode = 'failed'
     console.log('[live2d]', msg, '—— 显示皮肤头像占位')
     const img = document.createElement('img')
@@ -220,6 +226,8 @@ export class Live2DPlayer {
 
   /** 皮肤切换/销毁 */
   destroy(): void {
+    if (this.destroyed) return
+    this.destroyed = true
     this.cancelFinishTimer()
     if (this.emotionTimer) clearTimeout(this.emotionTimer)
     try {

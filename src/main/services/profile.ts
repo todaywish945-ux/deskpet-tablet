@@ -1,38 +1,37 @@
 import { randomUUID } from 'crypto'
-import { join } from 'path'
 import { appendFileSync, readFileSync, writeFileSync } from 'fs'
-import { app } from 'electron'
 import { UserProfile, ProfileFact } from '../../shared/types'
 import { streamChat } from './llm'
 import { LLMConfig } from '../../shared/types'
+import { characterStoreFile } from './store'
 
 /**
  * 档案记忆：跨会话的用户画像。每场通话结束后用一次 LLM 调用增量更新，
  * 之后每轮对话把档案注入系统提示——她记得你这个人。
- * 档案是唯一权威数据源（profile.json），UI 可查看/删除单条。
- * 被容量挤出或判定过时的事实不删除，转入全量档（profile-full.jsonl，append-only 只存档）。
+ * 每个角色一份（profile-<角色>.json），缺省归属当前激活角色；
+ * 被容量挤出或判定过时的事实不删除，转入全量档（profile-full-<角色>.jsonl，append-only 只存档）。
  */
 
 const MAX_FACTS = 60
 
-function profileFile(): string {
-  return join(app.getPath('userData'), 'data', 'profile.json')
+function profileFile(skinId?: string): string {
+  return characterStoreFile('profile.json', skinId)
 }
 
-function profileFullFile(): string {
-  return join(app.getPath('userData'), 'data', 'profile-full.jsonl')
+function profileFullFile(skinId?: string): string {
+  return characterStoreFile('profile-full.jsonl', skinId)
 }
 
 /** 全量档：append-only 存档被挤出/过时的事实，不注入提示词 */
-function appendProfileFull(entries: ProfileFact[], reason: 'overflow' | 'obsolete'): void {
+function appendProfileFull(entries: ProfileFact[], reason: 'overflow' | 'obsolete', skinId?: string): void {
   if (entries.length === 0) return
   const lines = entries.map((f) => JSON.stringify({ ...f, reason })).join('\n')
-  appendFileSync(profileFullFile(), lines + '\n', 'utf-8')
+  appendFileSync(profileFullFile(skinId), lines + '\n', 'utf-8')
 }
 
-export function loadProfile(): UserProfile {
+export function loadProfile(skinId?: string): UserProfile {
   try {
-    const raw = JSON.parse(readFileSync(profileFile(), 'utf-8')) as UserProfile
+    const raw = JSON.parse(readFileSync(profileFile(skinId), 'utf-8')) as UserProfile
     if (Array.isArray(raw?.facts)) return { facts: raw.facts }
   } catch {
     // 首次使用
@@ -40,20 +39,20 @@ export function loadProfile(): UserProfile {
   return { facts: [] }
 }
 
-export function saveProfile(profile: UserProfile): void {
-  writeFileSync(profileFile(), JSON.stringify(profile, null, 2), 'utf-8')
+export function saveProfile(profile: UserProfile, skinId?: string): void {
+  writeFileSync(profileFile(skinId), JSON.stringify(profile, null, 2), 'utf-8')
 }
 
-export function deleteFact(factId: string): UserProfile {
-  const profile = loadProfile()
+export function deleteFact(factId: string, skinId?: string): UserProfile {
+  const profile = loadProfile(skinId)
   profile.facts = profile.facts.filter((f) => f.id !== factId)
-  saveProfile(profile)
+  saveProfile(profile, skinId)
   return profile
 }
 
 /** 档案注入系统提示的段落（空档案返回空串） */
-export function profilePrompt(): string {
-  const facts = loadProfile().facts
+export function profilePrompt(skinId?: string): string {
+  const facts = loadProfile(skinId).facts
   if (facts.length === 0) return ''
   const lines = facts.map((f) => `- ${f.text}`).join('\n')
   return `\n\n【你长期记得的关于对方的事（跨通话记忆，自然使用，别机械复述）】\n${lines}`
@@ -79,10 +78,11 @@ interface ExtractAction {
 
 /**
  * 通话结束后台更新档案：把已有档案 + 本场对话交给模型，解析增删改动作。
+ * skinId 缺省归属当前激活角色（chatPipeline 会传会话归属角色，防 90 秒窗口串台）。
  * 任何失败都静默返回（记忆是锦上添花，绝不影响主流程）。
  */
-export async function updateProfileFromConversation(llm: LLMConfig, dialogue: string): Promise<void> {
-  const profile = loadProfile()
+export async function updateProfileFromConversation(llm: LLMConfig, dialogue: string, skinId?: string): Promise<void> {
+  const profile = loadProfile(skinId)
   const current =
     profile.facts.length > 0
       ? profile.facts.map((f) => `${f.id}: ${f.text}`).join('\n')
@@ -114,7 +114,7 @@ export async function updateProfileFromConversation(llm: LLMConfig, dialogue: st
       if (profile.facts.some((f) => f.text === action.text!.trim())) continue
       if (profile.facts.length >= MAX_FACTS) {
         const evicted = profile.facts.shift()
-        if (evicted) appendProfileFull([evicted], 'overflow')
+        if (evicted) appendProfileFull([evicted], 'overflow', skinId)
       }
       const fact: ProfileFact = {
         id: randomUUID().slice(0, 8),
@@ -132,11 +132,11 @@ export async function updateProfileFromConversation(llm: LLMConfig, dialogue: st
     } else if (action.action === 'remove' && action.id) {
       // 判定「不再成立」的先存进全量档，保留它曾经成立过的历史
       const obsolete = profile.facts.find((f) => f.id === action.id)
-      if (obsolete) appendProfileFull([obsolete], 'obsolete')
+      if (obsolete) appendProfileFull([obsolete], 'obsolete', skinId)
       profile.facts = profile.facts.filter((f) => f.id !== action.id)
     }
   }
-  saveProfile(profile)
+  saveProfile(profile, skinId)
 }
 
 /** 宽容解析模型输出：截取 JSON 数组段，逐项校验 */
@@ -170,7 +170,7 @@ export function dialogueForExtraction(
   const picked: string[] = []
   let total = 0
   for (const m of [...messages].reverse()) {
-    const line = `${m.role === 'user' ? '用户' : '瞬光'}：${m.content}`
+    const line = `${m.role === 'user' ? '用户' : '她'}：${m.content}`
     if (total + line.length > maxChars) break
     picked.unshift(line)
     total += line.length

@@ -8,6 +8,7 @@ const SAMPLE_RATE = 24000
 export class PcmPlayer {
   private ctx: AudioContext | null = null
   private nextTime = 0
+  private startTime = 0
   private sources = new Set<AudioBufferSourceNode>()
   private gains = new Set<GainNode>()
   private volume = 1
@@ -59,7 +60,8 @@ export class PcmPlayer {
     // 目的地优先连 analyser（音量之外还有口型电平），analyser 再到扬声器
     gain.connect(this.analyser ?? ctx.destination)
 
-    const startAt = Math.max(ctx.currentTime + 0.05, this.nextTime)
+    const startAt = this.nextTime > ctx.currentTime ? this.nextTime : ctx.currentTime + 0.05
+    if (this.nextTime <= ctx.currentTime) this.startTime = startAt
     source.start(startAt)
     this.nextTime = startAt + buffer.duration
 
@@ -77,17 +79,18 @@ export class PcmPlayer {
     }
   }
 
-  /** 是否还有没播完的音频。按 AudioContext 时间线判定（onended 在部分环境下不可靠）；
-   *  上下文不在运行态（挂起等）视为空闲，避免时间线停走导致嘴停不下来 */
   get busy(): boolean {
-    if (!this.ctx || this.ctx.state !== 'running') return false
-    // 30ms 余量：时间线走到最后一块结尾即视为播完
-    return this.ctx.currentTime < this.nextTime - 0.03
+    return this.remainingMs > 0
   }
 
-  /** 距离全部音频播完还剩多少毫秒（0 = 已播完/空闲）。收口动画据此倒排时机 */
+  get playing(): boolean {
+    return !!this.ctx && this.ctx.state === 'running' &&
+      this.ctx.currentTime >= this.startTime && this.ctx.currentTime < this.nextTime
+  }
+
+  // 挂起的音频仍在队列里，不能把静止的时钟误判为播放完成。
   get remainingMs(): number {
-    if (!this.ctx || this.ctx.state !== 'running') return 0
+    if (!this.ctx || this.ctx.state === 'closed') return 0
     return Math.max(0, (this.nextTime - this.ctx.currentTime) * 1000)
   }
 

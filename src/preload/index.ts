@@ -37,6 +37,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   winClose: () => ipcRenderer.invoke('win:close'),
   /** 可选角色皮肤列表（设置页下拉） */
   listSkins: () => ipcRenderer.invoke('skins:list'),
+  /** 敲敲界面内切换角色（= 换皮肤整体生效：人设/动画/语音） */
+  charActivate: (skinId: string) => ipcRenderer.invoke('char:activate', skinId),
   hidePet: () => ipcRenderer.invoke('app:hide-pet'),
   startDrag: (offsetX: number, offsetY: number) => ipcRenderer.send('win:start-drag', offsetX, offsetY),
   endDrag: () => ipcRenderer.send('win:end-drag'),

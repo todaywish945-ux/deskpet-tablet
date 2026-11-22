@@ -1,5 +1,5 @@
 import { ipcMain, app, dialog, BrowserWindow, screen } from 'electron'
-import { AppConfig } from '../shared/types'
+import { AppConfig, TTSConfig } from '../shared/types'
 import { getPetWindow, startDrag, stopDrag, popupPetMenu, applyPetLayer, focusPetWindow, setIslandToggleHandler, setHideToIslandHandler, setCollapseToIslandHandler, PET_WIDTH, PET_HEIGHT } from './petWindow'
 import {
   initIsland,
@@ -15,9 +15,10 @@ import {
 import { expandCard, collapseToCapsule, startIslandDrag, stopIslandDrag, peekIsland, retreatIsland } from './islandWindow'
 import { refreshTrayMenu, refreshTrayIcon } from './tray'
 import { createSettingsWindow } from './settingsWindow'
-import { petPat, isTurnActive, isPatActive } from './services/chatPipeline'
+import { petPat, isTurnActive, isPatActive, cancelPat } from './services/chatPipeline'
+import { emitPetEvent } from './services/petEvents'
 import { noteUserActivity, startProactive } from './services/proactive'
-import { ensureGsvService } from './services/gsv'
+import { ensureGsvService, stopSpawnedGsvExcept, warmUpGsv } from './services/gsv'
 import { getActiveSessionId, setActiveSession, setCallActive } from './services/sessionState'
 import {
   loadConfig,
@@ -26,6 +27,7 @@ import {
   saveSessions,
   newSession,
   listSkins,
+  resolveTtsConfig,
   assetRoot
 } from './services/store'
 import { runTurn, cancelActiveTurn } from './services/chatPipeline'
@@ -154,8 +156,9 @@ export function registerIpc(): void {
 
   // ---------- 档案记忆 ----------
 
-  ipcMain.handle('profile:get', () => loadProfile())
-  ipcMain.handle('profile:delete-fact', (_event, factId: string) => deleteFact(String(factId)))
+  // 档案面板只看当前角色自己的记忆卡（爱心挂在谁的组头上就看谁的）
+  ipcMain.handle('profile:get', () => loadProfile(loadConfig().character?.skin))
+  ipcMain.handle('profile:delete-fact', (_event, factId: string) => deleteFact(String(factId), loadConfig().character?.skin))
 
   // ---------- 喜欢的代理人：邀约卡星标（状态落在配置 character.favorite） ----------
   ipcMain.handle('char:favorite-get', () => loadConfig().character.favorite)
@@ -213,8 +216,38 @@ export function registerIpc(): void {
   ipcMain.handle('config:get', () => loadConfig())
   /** 可选皮肤列表（设置页下拉）：内置 assets/skins + 用户 userData/skins 合并 */
   ipcMain.handle('skins:list', () => listSkins())
-  ipcMain.handle('config:save', (_event, config: AppConfig) => {
+  /** 敲敲界面内切换角色：与设置页换肤走同一套切换动作（取消在途回合/换语音端口/托盘/广播） */
+  ipcMain.handle('char:activate', (_event, skinId: string) => {
+    const target = String(skinId ?? '')
+    if (!target || !listSkins().some((meta) => meta.id === target)) return false
+    const current = loadConfig()
+    if (current.character.skin === target) return true
+    const config: AppConfig = { ...current, character: { ...current.character, skin: target } }
+    const ttsConfig = resolveTtsConfig(config)
+    const sender = makeBroadcastSender()
+    cancelActiveTurn(sender)
+    cancelPat(sender)
     saveConfig(config)
+    void switchGsvForCharacter(ttsConfig, sender)
+    refreshTrayIcon() // 托盘图标跟皮肤走
+    for (const win of BrowserWindow.getAllWindows()) {
+      win.webContents.send('pet:config-changed')
+    }
+    return true
+  })
+  ipcMain.handle('config:save', (_event, config: AppConfig) => {
+    const skinChanged = loadConfig().character.skin !== config.character.skin
+    const ttsConfig = resolveTtsConfig(config) // 保存前校验，坏声明不能静默沿用旧音色
+    const sender = makeBroadcastSender()
+    if (skinChanged) {
+      cancelActiveTurn(sender)
+      cancelPat(sender)
+    }
+    saveConfig(config)
+    if (skinChanged) {
+      // 只确保新端口在线，不调用共享实例的 /set_*weights，也不在普通保存时重载模型。
+      void switchGsvForCharacter(ttsConfig, sender)
+    }
     // 窗口层级等设置改完立即生效
     applyPetLayer()
     applyIslandConfig()
@@ -235,7 +268,8 @@ export function registerIpc(): void {
   })
 
   ipcMain.handle('voice:test', async (_event, text: string) => {
-    const wav = await synthesizeWav(loadConfig().tts, text)
+    const ttsConfig = resolveTtsConfig(loadConfig())
+    const wav = await synthesizeWav(ttsConfig, text)
     return { wav: wav.toString('base64') }
   })
 
@@ -288,8 +322,16 @@ export function registerIpc(): void {
 
   // ---------- 启动常驻服务 ----------
 
-  // 本地语音服务没开就最小化自动拉起，省去先点启动脚本这一步
-  void ensureGsvService(loadConfig().tts)
+  // 本地语音服务没开就最小化自动拉起，省去先点启动脚本这一步；
+  // 顺手清掉上次运行留下的闲置角色实例（台账只记本应用拉起的，手动开的绝不碰）
+  void Promise.resolve()
+    .then(async () => {
+      const ttsConfig = resolveTtsConfig(loadConfig())
+      const stopped = await stopSpawnedGsvExcept(ttsConfig.gsvApiBase).catch(() => [] as string[])
+      if (stopped.length > 0) console.log('[gsv] 启动清理闲置语音实例:', stopped.join(', '))
+      await ensureGsvService(ttsConfig)
+    })
+    .catch((error) => console.error('[gsv] 角色语音启动失败:', error))
   // 她主动开口（闲置关心 / 早安晚安 / 心情周回顾）
   startProactive()
 
@@ -301,4 +343,34 @@ export function registerIpc(): void {
 function applyAutoStart(config: AppConfig): void {
   if (!app.isPackaged) return
   app.setLoginItemSettings({ openAtLogin: config.app.autoStart })
+}
+
+/** 主进程 → 所有窗口广播（pet 事件同时进 emitPetEvent 给控制桥/插件桥） */
+function makeBroadcastSender(): (channel: string, ...args: unknown[]) => void {
+  return (channel: string, ...args: unknown[]): void => {
+    emitPetEvent(channel, args)
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.isDestroyed() && !win.webContents.isDestroyed()) win.webContents.send(channel, ...args)
+    }
+  }
+}
+
+/** 换角色后的语音切换：停掉闲置实例（省显存）→ 确保新角色在线 → 后台预热（第一句话不再冷启动） */
+async function switchGsvForCharacter(
+  ttsConfig: TTSConfig,
+  sender: (channel: string, ...args: unknown[]) => void
+): Promise<void> {
+  try {
+    const stopped = await stopSpawnedGsvExcept(ttsConfig.gsvApiBase)
+    if (stopped.length > 0) console.log('[gsv] 换角色，清理闲置语音实例:', stopped.join(', '))
+  } catch (error) {
+    console.error('[gsv] 清理闲置语音实例失败:', error)
+  }
+  try {
+    await ensureGsvService(ttsConfig)
+  } catch (error: unknown) {
+    console.error('[gsv]', error)
+    sender('pet:tts-error', (error as Error).message)
+  }
+  void warmUpGsv(ttsConfig) // 后台预热模型，别让第一句话等冷启动
 }

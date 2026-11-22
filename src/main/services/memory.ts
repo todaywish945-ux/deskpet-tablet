@@ -1,10 +1,8 @@
 import { randomUUID } from 'crypto'
-import { join } from 'path'
 import { appendFileSync, readFileSync, writeFileSync } from 'fs'
-import { app } from 'electron'
 import { LLMConfig } from '../../shared/types'
 import { streamChat } from './llm'
-import { loadSessions } from './store'
+import { loadSessions, characterStoreFile, activeSkinId } from './store'
 import { dialogueForExtraction } from './profile'
 
 /**
@@ -41,18 +39,24 @@ const FORGET_CLARITY = 0.1
 /** 清晰度低于此值按「模糊印象」的措辞注入 */
 const FUZZY_CLARITY = 0.45
 
-function memoryFile(): string {
-  return join(app.getPath('userData'), 'data', 'memory.json')
+/** 会话归属的角色 id（会话没有标记时按当前激活角色兜底） */
+function sessionSkinId(sessionId?: string): string {
+  const session = sessionId ? loadSessions().sessions.find((s) => s.id === sessionId) : undefined
+  return session?.characterId || activeSkinId()
 }
 
-function fullCardFile(): string {
-  return join(app.getPath('userData'), 'data', 'memory-full.jsonl')
+function memoryFile(skinId?: string): string {
+  return characterStoreFile('memory.json', skinId)
+}
+
+function fullCardFile(skinId?: string): string {
+  return characterStoreFile('memory-full.jsonl', skinId)
 }
 
 /** 全量卡：append-only，只存档不召回，保证被挤出衰减卡的回忆永远可查 */
-function appendFullCard(entries: Episode[]): void {
+function appendFullCard(entries: Episode[], skinId?: string): void {
   if (entries.length === 0) return
-  appendFileSync(fullCardFile(), entries.map((e) => JSON.stringify(e)).join('\n') + '\n', 'utf-8')
+  appendFileSync(fullCardFile(skinId), entries.map((e) => JSON.stringify(e)).join('\n') + '\n', 'utf-8')
 }
 
 /** 回忆清晰度：按记录时间距今天数半衰。纯推导值，不落盘、任何时刻可算 */
@@ -61,9 +65,9 @@ function clarityOf(episode: Episode, now: number): number {
   return Math.pow(0.5, days / CLARITY_HALF_LIFE_DAYS)
 }
 
-function loadMemory(): MemoryStore {
+function loadMemory(skinId?: string): MemoryStore {
   try {
-    const raw = JSON.parse(readFileSync(memoryFile(), 'utf-8')) as MemoryStore
+    const raw = JSON.parse(readFileSync(memoryFile(skinId), 'utf-8')) as MemoryStore
     if (Array.isArray(raw?.episodes)) return { episodes: raw.episodes }
   } catch {
     // 首次使用
@@ -71,8 +75,8 @@ function loadMemory(): MemoryStore {
   return { episodes: [] }
 }
 
-function saveMemory(store: MemoryStore): void {
-  writeFileSync(memoryFile(), JSON.stringify(store, null, 2), 'utf-8')
+function saveMemory(store: MemoryStore, skinId?: string): void {
+  writeFileSync(memoryFile(skinId), JSON.stringify(store, null, 2), 'utf-8')
 }
 
 async function embed(llm: LLMConfig, text: string): Promise<number[] | null> {
@@ -123,20 +127,22 @@ let summaryBusy = false
 /** 容量告警去重：只在跨越新档位（80/90/100%）时提示一次 */
 let capacityWarnedPct = 0
 
-/** 对话静默后调度一次回忆压缩（chatPipeline 每轮对话后调用） */
+/** 对话静默后调度一次回忆压缩（chatPipeline 每轮对话后调用）。
+ *  排期时就锁定会话归属角色：90 秒窗口内切了角色，回忆也写进原会话角色的记忆卡 */
 export function scheduleSummary(sessionId: string, llm: LLMConfig): void {
+  const skinId = sessionSkinId(sessionId)
   const prev = summaryTimers.get(sessionId)
   if (prev) clearTimeout(prev)
   summaryTimers.set(
     sessionId,
     setTimeout(() => {
       summaryTimers.delete(sessionId)
-      void runSummary(sessionId, llm)
+      void runSummary(sessionId, llm, skinId)
     }, 90_000)
   )
 }
 
-async function runSummary(sessionId: string, llm: LLMConfig): Promise<void> {
+async function runSummary(sessionId: string, llm: LLMConfig, skinId: string): Promise<void> {
   if (summaryBusy) return // 下一轮对话会再次排期
   summaryBusy = true
   try {
@@ -162,7 +168,7 @@ async function runSummary(sessionId: string, llm: LLMConfig): Promise<void> {
     text = text.replace(/^["'「『]+|["'」』]+$/g, '').trim()
     if (!text) return
 
-    const store = loadMemory()
+    const store = loadMemory(skinId)
     const now = Date.now()
     const episode: Episode = {
       id: randomUUID().slice(0, 8),
@@ -179,8 +185,8 @@ async function runSummary(sessionId: string, llm: LLMConfig): Promise<void> {
       const dropped = store.episodes.shift()
       if (dropped) overflow.push(dropped)
     }
-    appendFullCard(overflow)
-    saveMemory(store)
+    appendFullCard(overflow, skinId)
+    saveMemory(store, skinId)
     const pct = Math.round((store.episodes.length / MAX_EPISODES) * 100)
     if (pct >= 80 && pct > capacityWarnedPct) {
       capacityWarnedPct = pct
@@ -198,11 +204,13 @@ async function runSummary(sessionId: string, llm: LLMConfig): Promise<void> {
 
 /**
  * 每轮对话前的语义召回：把与这句话最相关的旧回忆拼进 system prompt。
+ * 只从当前会话归属角色的记忆卡里召回（skinId 缺省按会话归属，兜底当前激活角色）。
  * 任何失败返回空串，绝不影响主流程。
  */
-export async function recallForTurn(llm: LLMConfig, query: string, currentSessionId: string): Promise<string> {
+export async function recallForTurn(llm: LLMConfig, query: string, currentSessionId: string, skinId?: string): Promise<string> {
   try {
-    const store = loadMemory()
+    const id = skinId || sessionSkinId(currentSessionId)
+    const store = loadMemory(id)
     const pool = store.episodes.filter((e) => e.sessionId !== currentSessionId)
     if (pool.length === 0) return ''
 

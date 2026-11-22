@@ -9,8 +9,10 @@ declare global {
       winMinimize: () => Promise<void>
       winMaximizeToggle: () => Promise<void>
       winClose: () => Promise<void>
-      /** 可选角色皮肤列表（设置页下拉） */
-      listSkins: () => Promise<{ id: string; name: string; backend: 'video' | 'live2d' }[]>
+      /** 可选角色皮肤列表（设置页下拉 / 敲敲分组树与联系人卡） */
+      listSkins: () => Promise<{ id: string; name: string; backend: 'video' | 'live2d'; avatar?: string }[]>
+      /** 敲敲界面内切换角色（= 换皮肤整体生效：人设/动画/语音） */
+      charActivate: (skinId: string) => Promise<boolean>
       hidePet: () => Promise<void>
       startDrag: (offsetX: number, offsetY: number) => void
       endDrag: () => void

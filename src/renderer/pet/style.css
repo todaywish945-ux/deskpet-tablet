@@ -173,6 +173,7 @@ button {
   /* 不满 1 的透明度阻止 Chromium 把 video 提升为 DirectComposition 硬件叠加层：
      叠加层由系统合成、无视 #screen 的圆角裁剪，会在窗口四角漏出直角方块 */
   opacity: 0.999;
+  isolation: isolate;
   /* 圆角裁剪再加一层（叠加层候选会因非矩形裁剪被拒），双保险防说话时闪角 */
   border-radius: var(--screen-radius);
   overflow: hidden;
@@ -184,6 +185,8 @@ button {
 }
 
 #char-layer video {
+  /* 避免交叉淡化的中点露出底色、画面变暗。 */
+  mix-blend-mode: plus-lighter;
   position: absolute;
   inset: 0;
   width: 100%;
@@ -390,7 +393,12 @@ img.char.pop-in {
   gap: 6px;
 }
 
-/* 邀约页联系人卡（游戏：头像+名字+绿色在线…） */
+/* 邀约页联系人卡（游戏：头像+名字+绿色在线…）：一张卡一个角色，点击切换 */
+#contact-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
 .video-contact {
   display: flex;
   align-items: center;
@@ -399,6 +407,16 @@ img.char.pop-in {
   border-radius: 14px;
   background: var(--kk-yellow);
   color: #111827;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.video-contact:not(.active) {
+  background: rgba(255, 255, 255, 0.06);
+  color: #d1d5db;
+  border: 1px solid rgba(75, 85, 99, 0.35);
+}
+.video-contact:not(.active) .online {
+  color: rgba(156, 163, 175, 0.6);
 }
 .video-contact .online {
   margin-top: 1px;
@@ -749,6 +767,17 @@ img.char.pop-in {
   font-size: 10px;
   font-style: normal;
 }
+/* 多角色分组树：当前角色组头黄描边高亮，非当前组头压暗一点 */
+.char-group-head.active {
+  background: rgba(255, 214, 19, 0.14);
+  border-color: rgba(255, 214, 19, 0.55);
+}
+.char-group-head.active .g-name {
+  color: var(--kk-yellow);
+}
+.char-group-head:not(.active) {
+  opacity: 0.82;
+}
 
 /* Info 区：角色名黄字高亮 */
 #side-info {
@@ -925,6 +954,27 @@ img.char.pop-in {
   width: 15px;
   height: 15px;
   fill: #828282;
+}
+/* 会话头角色标识：小头像 + 角色名，点开谁的会话就显示谁 */
+#session-head .head-avatar {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid rgba(0, 0, 0, 0.75);
+  background: #e2e8f0;
+}
+#session-head .head-char {
+  flex: none;
+  color: var(--kk-yellow);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+#session-head .head-char:not(:empty)::after {
+  content: ' ·';
+  color: rgba(156, 163, 175, 0.5);
 }
 
 #session-title{
@@ -1981,4 +2031,59 @@ img.char.pop-in {
   width: 13px;
   height: 13px;
   fill: rgba(156, 163, 175, 0.75);
+}
+
+/* ---------- 页面内确认弹窗（替代 window.confirm）----------
+   原生 confirm 抢系统焦点 → 平板 blur 沉底 → 整块退后台；
+   自绘弹窗没有焦点转移，删除确认留在敲敲界面里 */
+.qq-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99;
+  background: rgba(8, 10, 14, 0.45);
+  display: grid;
+  place-items: center;
+}
+.qq-confirm-card {
+  width: 244px;
+  padding: 18px 14px 12px;
+  border-radius: 12px;
+  background: #16181d;
+  border: 1px solid var(--kk-gray-600);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.5);
+}
+.qq-confirm-text {
+  font-size: 13px;
+  line-height: 1.5;
+  color: #f4f4f6;
+  text-align: center;
+}
+.qq-confirm-row {
+  margin-top: 14px;
+  display: flex;
+  gap: 8px;
+}
+.qq-confirm-btn {
+  flex: 1;
+  height: 28px;
+  border-radius: 7px;
+  border: 1px solid var(--kk-gray-600);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(209, 213, 219, 0.9);
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: filter 0.12s ease, background 0.12s ease;
+}
+.qq-confirm-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.qq-confirm-btn.danger {
+  border-color: rgba(248, 113, 113, 0.45);
+  background: rgba(248, 113, 113, 0.14);
+  color: #f87171;
+  font-weight: 600;
+}
+.qq-confirm-btn.danger:hover {
+  background: rgba(248, 113, 113, 0.24);
 }

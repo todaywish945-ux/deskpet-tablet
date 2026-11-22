@@ -8,8 +8,8 @@ import { createIslandWindow } from './islandWindow'
 import { createTray } from './tray'
 import { createSettingsWindow } from './settingsWindow'
 import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
-import { assetRoot, activeSkinDir, loadConfig } from './services/store'
-import { warmUpGsv } from './services/gsv'
+import { assetRoot, activeSkinDir, findSkinDir, loadConfig, resolveTtsConfig } from './services/store'
+import { stopSpawnedGsvExcept, warmUpGsv } from './services/gsv'
 import { processStagedSkinInstalls } from './services/skinStore'
 
 // 产品名已改为「敲敲」：数据目录沿用旧名，历史配置/会话/记忆（含 API Key）原地保留，
@@ -52,12 +52,18 @@ function serveAsset(url: string, request: Request): Response {
   //   按 host 路由（旧代码按 pathname 判断恰好因 host='assets' 被丢弃而等效）
   const parsed = new URL(url)
   let root: string
-  if (parsed.host === 'skin') {
+  let rel = decodeURIComponent(parsed.pathname).replace(/^\/+/, '')
+  if (parsed.host === 'skins') {
+    const [id, ...parts] = rel.split('/')
+    const selected = findSkinDir(id)
+    if (!selected) return new Response('not found', { status: 404 })
+    root = selected
+    rel = parts.join('/')
+  } else if (parsed.host === 'skin') {
     root = activeSkinDir()
   } else {
     root = assetRoot()
   }
-  const rel = decodeURIComponent(parsed.pathname).replace(/^\/+/, '')
   const full = normalize(join(root, rel))
   if (!full.startsWith(root + sep) && full !== root) {
     return new Response('forbidden', { status: 403 })
@@ -85,6 +91,7 @@ function serveAsset(url: string, request: Request): Response {
           'Content-Range': `bytes ${start}-${end}/${data.length}`,
           'Content-Length': String(slice.length),
           'Accept-Ranges': 'bytes',
+          'Cache-Control': 'no-cache',
           'Access-Control-Allow-Origin': '*'
         }
       })
@@ -141,7 +148,16 @@ if (!gotLock) {
     registerIpc()
     startPluginBridge() // 桥先起：打包版桌宠窗口要从桥加载页面（见 petWindow.ts）
     createPetWindow()
-    void warmUpGsv(loadConfig().tts) // 预热本地语音：模型先装显存，用户第一句话不再冷启动
+    // 先清掉上次运行留下的闲置角色实例（台账只记本应用拉起的，手动开的绝不碰），再预热当前角色。
+    // 预热同样使用当前角色快照；声明损坏只报错，不阻止窗口初始化。
+    void Promise.resolve()
+      .then(async () => {
+        const ttsConfig = resolveTtsConfig(loadConfig())
+        const stopped = await stopSpawnedGsvExcept(ttsConfig.gsvApiBase).catch(() => [] as string[])
+        if (stopped.length > 0) console.log('[gsv] 启动清理闲置语音实例:', stopped.join(', '))
+        await warmUpGsv(ttsConfig)
+      })
+      .catch((error) => console.error('[gsv] 角色语音预热失败:', error))
     initIsland() // 灵动岛闲置计时挂在桌宠窗口的 blur/focus 上（窗口已建好）
     createIslandWindow() // 独立岛窗口：闲置收起平板后亮出胶囊
     createTray()

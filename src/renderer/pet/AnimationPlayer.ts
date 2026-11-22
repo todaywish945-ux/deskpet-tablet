@@ -84,6 +84,8 @@ export class AnimationPlayer {
   /** 每次画面切换自增；异步回调比对 token，过期即放弃，防止旧切换污染新状态 */
   private fadeToken = 0
   private monitorStarted = false
+  private monitorFrame = 0
+  private destroyed = false
   private failStreak = 0
   private blankTicks = 0
   /** 岛收起期间画面是主动冻结的：空白自愈必须让路 */
@@ -97,10 +99,12 @@ export class AnimationPlayer {
   private enteringTimer: ReturnType<typeof setTimeout> | null = null
   /** 正在播"说话→待机"过渡：结束后回待机循环 */
   private exiting = false
+  private talkReady: ((ready: boolean) => void) | null = null
+  private speechPaused = false
 
   constructor(container: HTMLElement, base = 'petasset://assets') {
     this.container = container
-    this.base = base
+    this.base = new URL(base.replace(/\/$/, '') + '/', document.baseURI).href.replace(/\/$/, '')
   }
 
   async init(): Promise<void> {
@@ -113,6 +117,7 @@ export class AnimationPlayer {
         `${this.base}/animations/loop-points.json${bust}`
       )
     ])
+    if (this.destroyed) return
     if (reactions) this.buildEmotionMap(reactions)
     if (points) this.loopPoints = points
 
@@ -129,6 +134,30 @@ export class AnimationPlayer {
       this.setupPlaceholder()
     }
     this.render(true)
+  }
+
+  destroy(): void {
+    if (this.destroyed) return
+    this.destroyed = true
+    this.mode = 'loading'
+    this.fadeToken++
+    cancelAnimationFrame(this.monitorFrame)
+    this.cancelFinishTimer()
+    if (this.emotionTimer) clearTimeout(this.emotionTimer)
+    if (this.preloadTimer) clearTimeout(this.preloadTimer)
+    const layers = this.layers
+    this.layers = []
+    for (const video of layers) {
+      video.oncanplay = null
+      video.onended = null
+      video.onerror = null
+      video.pause()
+      video.removeAttribute('src')
+      video.load()
+      video.remove()
+    }
+    this.img?.remove()
+    this.img = null
   }
 
   private async tryFetchJson<T>(url: string): Promise<T | null> {
@@ -158,13 +187,42 @@ export class AnimationPlayer {
   resumeAll(): void {
     this.frozen = false
     const current = this.layers[this.activeLayer]
-    if (current && current.src) void current.play().catch(() => undefined)
+    if (current && current.src && !this.speechPaused) void current.play().catch(() => undefined)
     if (!this.layers.some((v) => Number(v.style.opacity || '0') > 0.5)) this.render(true)
   }
 
+  startTalking(): Promise<boolean> {
+    if (this.destroyed) return Promise.resolve(false)
+    this.talkReady?.(false)
+    return new Promise((resolve) => {
+      this.talkReady = resolve
+      this.setTalking(true)
+      if (this.mode === 'placeholder' || (this.mode === 'video' && this.talkList.length === 0)) {
+        this.talkReady = null
+        resolve(true)
+      }
+    })
+  }
+
+  setSpeechPaused(paused: boolean): void {
+    if (this.speechPaused === paused) return
+    this.speechPaused = paused
+    if (this.state !== 'talk' || this.enteringTalk || this.exiting) return
+    const current = this.layers[this.activeLayer]
+    if (!current) return
+    if (paused) current.pause()
+    else if (!this.frozen) void current.play().catch(() => undefined)
+  }
+
   /** 用户开口/闭口 */
-  setTalking(talking: boolean): void {    const wasTalking = this.state === 'talk'
-    this.state = talking ? 'talk' : 'idle'
+  setTalking(talking: boolean): void {
+    if (!talking) {
+      this.finishTalkingAt(0)
+      return
+    }
+    const wasTalking = this.state === 'talk'
+    this.state = 'talk'
+    this.speechPaused = false
     if (talking) {
       // 新回复打断一切收势与未触发的音频收口
       if (this.finishTimer) {
@@ -183,6 +241,7 @@ export class AnimationPlayer {
         clearTimeout(this.emotionTimer)
         this.emotionTimer = null
       }
+      const emotion = this.emotion
       this.emotion = null
       // "待机→说话"过渡还在播：不切画面，过渡播完由 onClipFinished 链入说话循环。
       // 但过渡片已不在播（被点按切层/ended 丢失/停帧）时标记会卡死，必须清掉继续开口
@@ -200,8 +259,8 @@ export class AnimationPlayer {
       }
       if (this.talkList.length > 0) {
         // 从待机重新开口：选说话方式。已有情绪指引时按情绪选，否则随机避开上一次用的
-        if (this.emotion && this.talkForEmotion(this.emotion)) {
-          this.currentTalk = this.talkForEmotion(this.emotion)
+        if (!wasTalking && emotion && this.talkForEmotion(emotion)) {
+          this.currentTalk = this.talkForEmotion(emotion)
         } else if (!this.currentTalk) {
           const prev = this.currentTalk
           const pool = this.talkList.length > 1 ? this.talkList.filter((f) => f !== prev) : this.talkList
@@ -214,25 +273,10 @@ export class AnimationPlayer {
       const tr = style ? this.transitions[style] : null
       if (style && tr?.enter && !wasTalking) {
         this.enteringTalk = style
-        this.armEnteringTimer(style)
         this.showVideo(`${this.base}/animations/${tr.enter}`, { loop: false }, true, 200)
-        this.preloadHidden(`${this.base}/animations/${style}`, 300)
         return
       }
-    } else if (this.emotion) {
-      // 情绪片段还在播：让它播完直接回待机，不播收势（收势只跟说话素材衔接）
-      return
-    } else if (this.currentTalk && this.manifest?.settle?.[this.currentTalk]) {
-      // 说话结束：不切片段，让当前视频自然播完尾巴，ended 后无缝链入紧邻的收势片段
-      this.pendingSettle = this.manifest.settle[this.currentTalk]
-      this.loopingClip = false
-      this.activeLoop = null
-      this.preloadSettle(this.pendingSettle)
-      return
     }
-    // 说话结束时若情绪片段还在播：让它播完由 ended 直接过渡到待机，
-    // 避免插进一瞬间的说话画面再切走（看起来像闪一下）
-    if (!talking && this.emotion) return
     this.render()
   }
 
@@ -271,8 +315,9 @@ export class AnimationPlayer {
   /** 延迟把片段预载进当前隐藏层（等层间淡出结束后再写 src，避免闪黑）。
    *  铁律：绝不写可见层——往显示中的 video 写 src 会清空画面露出底色（白闪） */
   private preloadHidden(url: string, delayMs = 900): void {
+    const token = this.fadeToken
     setTimeout(() => {
-      if (this.mode !== 'video') return
+      if (this.mode !== 'video' || token !== this.fadeToken) return
       const hidden = this.layers[1 - this.activeLayer]
       if (this.layers[this.activeLayer] === hidden) return // 目标是可见层：放弃（showVideo 会冷加载兜底）
       if (hidden.src === url) return
@@ -283,51 +328,42 @@ export class AnimationPlayer {
     }, delayMs)
   }
 
-  /**
-   * 音频驱动的收口：语音还剩 msUntilAudioEnd 播完。
-   * 有出场过渡的风格：倒排时机播"说话→待机"过渡片，语音结束瞬间正好过渡完成落回待机；
-   * 无过渡的风格：提前留出过渡时间淡出说话画面。过渡时长夹在 200~600ms。
-   */
+  // 退出过渡在声音播完后开始，不占用说话循环对应的语音时间。
   finishTalkingAt(msUntilAudioEnd: number): void {
-    this.state = 'idle'
-    this.pendingSettle = null
-    this.settling = null
-    const tr = this.currentTalk ? this.transitions[this.currentTalk] : null
-    if (tr?.exit) {
-      this.loopingClip = false
-      this.activeLoop = null
-      // 出场片时长从隐藏层元数据读（preloadHidden 已在说话期间载好），读不到按 0.7s 估
-      const hidden = this.layers[1 - this.activeLayer]
-      const exitUrl = `${this.base}/animations/${tr.exit}`
-      const dur =
-        hidden.src === exitUrl && isFinite(hidden.duration) && hidden.duration > 0 ? hidden.duration : 0.7
-      const delay = Math.max(0, msUntilAudioEnd / 1000 - dur)
-      if (this.finishTimer) clearTimeout(this.finishTimer)
-      this.finishTimer = setTimeout(() => {
-        this.finishTimer = null
-        this.exiting = true
-        this.showVideo(exitUrl, { loop: false }, true, 250)
-        // 待机片段预载回另一层：450ms 后写（淡出 250ms 已结束、出场片 650ms 还没播完），
-        // 若等到出场片播完再写会命中还在显示尾帧的可见层 → 画面被清空白闪
-        const idleFile = this.idleList[this.idleIdx]
-        if (idleFile) this.preloadHidden(`${this.base}/animations/${idleFile}`, 450)
-        this.currentTalk = null
-      }, delay * 1000)
-      return
-    }
-    this.loopingClip = false
-    this.activeLoop = null
-    const transitionMs = Math.min(600, Math.max(200, msUntilAudioEnd))
-    const delay = Math.max(0, msUntilAudioEnd - transitionMs)
     if (this.finishTimer) clearTimeout(this.finishTimer)
-    this.finishTimer = setTimeout(() => {
+    const finish = (): void => {
       this.finishTimer = null
-      this.render(true, 450)
-    }, delay)
+      if (this.exiting) return
+      const wasTalking = this.state === 'talk'
+      this.cancelFinishTimer()
+      this.state = 'idle'
+      this.speechPaused = false
+      this.pendingSettle = null
+      this.settling = null
+      this.emotion = null
+      if (this.emotionTimer) clearTimeout(this.emotionTimer)
+      this.emotionTimer = null
+      const tr = wasTalking && this.currentTalk ? this.transitions[this.currentTalk] : null
+      if (tr?.exit) {
+        this.exiting = true
+        this.layers[this.activeLayer]?.pause()
+        this.showVideo(`${this.base}/animations/${tr.exit}`, { loop: false }, true, 200)
+      } else {
+        this.currentTalk = null
+        this.render(true, 200)
+      }
+    }
+    if (msUntilAudioEnd <= 0) finish()
+    else this.finishTimer = setTimeout(finish, msUntilAudioEnd)
   }
 
   /** 打断时取消未触发的收口（否则会在新一轮开口后才切走） */
   cancelFinishTimer(): void {
+    this.talkReady?.(false)
+    this.talkReady = null
+    this.enteringTalk = null
+    if (this.enteringTimer) clearTimeout(this.enteringTimer)
+    this.enteringTimer = null
     if (this.finishTimer) {
       clearTimeout(this.finishTimer)
       this.finishTimer = null
@@ -338,7 +374,6 @@ export class AnimationPlayer {
     }
   }
 
-  /** 过渡片兜底：2s 内没有链入说话循环（ended 丢失/被切层）就强制清标记并补播，避免卡在待机 */
   private armEnteringTimer(style: string): void {
     if (this.enteringTimer) clearTimeout(this.enteringTimer)
     this.enteringTimer = setTimeout(() => {
@@ -347,16 +382,15 @@ export class AnimationPlayer {
       this.enteringTalk = null
       if (this.state === 'talk') {
         this.showVideo(`${this.base}/animations/${style}`, { loop: true }, true, 120)
-        const tr = this.transitions[style]
-        if (tr?.exit) this.preloadHidden(`${this.base}/animations/${tr.exit}`)
       } else {
         this.render()
       }
-    }, 2000)
+    }, Math.max(2000, (this.layers[this.activeLayer].duration || 0) * 1000 + 300))
   }
 
   /** 展示情绪（一段时间后自动回落到说话/待机）。情绪同时决定本条回复的说话风格 */
   setEmotion(name: string): void {
+    if (this.state === 'talk' || this.enteringTalk || this.exiting) return
     this.emotion = name
     if (this.emotionTimer) clearTimeout(this.emotionTimer)
     this.emotionTimer = setTimeout(() => {
@@ -372,7 +406,7 @@ export class AnimationPlayer {
 
   /** 点击屏幕：切换到下一段待机动画并循环它 */
   cycleIdle(): void {
-    if (this.mode !== 'video' || this.idleList.length <= 1) return
+    if (this.mode !== 'video' || this.idleList.length <= 1 || this.state === 'talk' || this.enteringTalk || this.exiting) return
     this.idleIdx = (this.idleIdx + 1) % this.idleList.length
     this.render(true)
   }
@@ -386,11 +420,11 @@ export class AnimationPlayer {
       video.playsInline = true
       video.preload = 'auto'
       video.style.opacity = '0'
-      video.addEventListener('ended', () => {
+      video.onended = () => {
         // 只有非循环片段（情绪/收势/说话尾巴）会真正播到头
         if (video === this.layers[this.activeLayer]) this.onClipFinished(video)
-      })
-      video.addEventListener('error', () => {
+      }
+      video.onerror = () => {
         // 单个片段缺失：跳到下一段待机（或结束情绪）；整轮全缺则放弃（壁纸仍在）
         if (video === this.layers[this.activeLayer]) {
           this.failStreak++
@@ -399,7 +433,7 @@ export class AnimationPlayer {
           }
           this.onClipFinished(video)
         }
-      })
+      }
       this.container.appendChild(video)
       this.layers.push(video)
     }
@@ -411,7 +445,8 @@ export class AnimationPlayer {
     // "待机→说话"过渡播完：声音已到（state=talk）→ 链入说话循环；
     // 声音未到（合成中）→ 停在过渡尾帧待命，12 秒后仍未开口则自行回待机
     // （合成被慢机器/显存抢占拖长时不至于僵在半路姿势里）
-    if (this.enteringTalk && endedVideo && endedVideo === this.layers[this.activeLayer]) {
+    if (this.enteringTalk && endedVideo && endedVideo === this.layers[this.activeLayer] &&
+        endedVideo.src === `${this.base}/animations/${this.transitions[this.enteringTalk]?.enter}`) {
       const talk = this.enteringTalk
       this.enteringTalk = null
       if (this.enteringTimer) {
@@ -420,9 +455,6 @@ export class AnimationPlayer {
       }
       if (this.state === 'talk') {
         this.showVideo(`${this.base}/animations/${talk}`, { loop: true }, true, 120)
-        // 说话占住一层后，把出场过渡预载进空闲层，收口时零等待
-        const tr = this.transitions[talk]
-        if (tr?.exit) this.preloadHidden(`${this.base}/animations/${tr.exit}`)
       } else {
         if (this.holdTimer) clearTimeout(this.holdTimer)
         this.holdTimer = setTimeout(() => {
@@ -438,9 +470,11 @@ export class AnimationPlayer {
       return
     }
     // "说话→待机"过渡播完：回到待机循环（idle 片段已由 preloadHidden 预载回隐藏层）
-    if (this.exiting && endedVideo && endedVideo === this.layers[this.activeLayer]) {
+    if (this.exiting && endedVideo && endedVideo === this.layers[this.activeLayer] &&
+        endedVideo.src === `${this.base}/animations/${this.transitions[this.currentTalk ?? '']?.exit}`) {
       this.exiting = false
-      this.render()
+      this.currentTalk = null
+      this.render(false, 200)
       return
     }
     // 说话片段尾巴播完：无缝链入紧邻的收势片段（收势首帧=尾巴末帧的下一帧）
@@ -467,15 +501,16 @@ export class AnimationPlayer {
     if (this.monitorStarted) return
     this.monitorStarted = true
     const tick = (): void => {
+      if (this.destroyed) return
       if (this.mode === 'video') {
         this.checkLoopPoints()
         this.checkLoopFade()
         this.checkStuck()
         this.checkBlank()
       }
-      requestAnimationFrame(tick)
+      this.monitorFrame = requestAnimationFrame(tick)
     }
-    requestAnimationFrame(tick)
+    this.monitorFrame = requestAnimationFrame(tick)
   }
 
   /** 悬空自愈：两路视频都透明超过 ~1.5s（换层中途 play 挂起/被打断）→ 画面只剩壁纸，强制按状态重画 */
@@ -503,6 +538,7 @@ export class AnimationPlayer {
    *  ② 元素已播完/暂停停在尾帧（换层时 play() 挂起不换屏）——原来自愈盲区，
    *     只在待机态兜底（开口前的过渡尾帧待命、收势链入是正常停留，不能动） */
   private checkStuck(): void {
+    if (this.frozen || this.speechPaused) return
     const cur = this.layers[this.activeLayer]
     if (!cur.src) {
       this.stuckTicks = 0
@@ -659,7 +695,7 @@ export class AnimationPlayer {
   }
 
   private render(force = false, fadeMs?: number): void {
-    if (this.mode === 'loading') return
+    if (this.mode === 'loading' || this.enteringTalk || this.exiting) return
     // 说话尾巴待播收势：冻结当前选择，让视频自然播完（ended 会链入收势）
     if (this.pendingSettle) return
 
@@ -704,6 +740,10 @@ export class AnimationPlayer {
       const file = src.split('/').pop() ?? ''
       this.activeLoop = opts.loop && !nativeLoop ? (this.loopPoints[file] ?? null) : null
       current.loop = nativeLoop
+      if (this.state === 'talk' && src === `${this.base}/animations/${this.currentTalk}`) {
+        this.talkReady?.(true)
+        this.talkReady = null
+      }
       return
     }
 
@@ -739,18 +779,24 @@ export class AnimationPlayer {
           setTimeout(() => {
             if (token === this.fadeToken && this.layers[this.activeLayer] !== current) current.pause()
           }, 750)
-          if (this.state === 'idle' && !this.emotion && !this.settling && !this.pendingSettle) {
+          const tr = this.currentTalk ? this.transitions[this.currentTalk] : null
+          if (this.enteringTalk && src === `${this.base}/animations/${tr?.enter}`) {
+            this.armEnteringTimer(this.enteringTalk)
+            this.preloadHidden(`${this.base}/animations/${this.enteringTalk}`, 250)
+          } else if (this.state === 'talk' && src === `${this.base}/animations/${this.currentTalk}`) {
+            this.talkReady?.(true)
+            this.talkReady = null
+            if (tr?.exit) this.preloadHidden(`${this.base}/animations/${tr.exit}`, 250)
+          } else if (this.exiting) {
+            const idle = this.currentIdleClip()
+            if (idle) this.preloadHidden(idle, 250)
+          } else if (this.state === 'idle' && !this.emotion && !this.settling && !this.pendingSettle) {
             this.scheduleTalkPreload()
-          }
-          // 说话动画上屏后，把出场过渡预载进空闲层（收口零等待）
-          if (this.state === 'talk' && this.currentTalk) {
-            const tr = this.transitions[this.currentTalk]
-            if (tr?.exit) this.preloadHidden(`${this.base}/animations/${tr.exit}`)
           }
         })
         .catch(() => undefined)
     }
-    if (next.src === src && next.readyState >= 3) {
+    if (next.src === src && next.readyState >= 3 && next.currentTime === 0) {
       swap()
     } else {
       next.src = src
@@ -767,7 +813,7 @@ export class AnimationPlayer {
     if (this.talkList.length === 0) return
     this.preloadTimer = setTimeout(() => {
       this.preloadTimer = null
-      if (this.mode !== 'video' || this.state !== 'idle' || this.emotion) return
+      if (this.mode !== 'video' || this.state !== 'idle' || this.emotion || this.exiting || this.enteringTalk) return
       const hidden = this.layers[1 - this.activeLayer]
       const url = `${this.base}/animations/${this.talkList[0]}`
       if (hidden.src === url || hidden.readyState >= 3) return

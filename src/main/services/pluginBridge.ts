@@ -5,7 +5,7 @@ import { WebSocketServer, WebSocket } from 'ws'
 import { app, ipcMain } from 'electron'
 import { EMOTIONS } from '../../shared/types'
 import { getPetWindow } from '../petWindow'
-import { assetRoot, activeSkinDir, loadConfig, loadSessions, newSession, saveSessions } from './store'
+import { assetRoot, activeSkinDir, loadConfig, loadSessions, newSession, saveSessions, resolveTtsConfig } from './store'
 import { isTtsReady } from './tts'
 import { getActiveSessionId, isCallActive, setActiveSession } from './sessionState'
 import { noteUserActivity } from './proactive'
@@ -247,7 +247,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       app: 'ye-shunguang-deskpet',
       version: app.getVersion(),
       dev: !app.isPackaged,
-      ttsReady: isTtsReady(config.tts),
+      ttsReady: isTtsReady(resolveTtsConfig(config)),
       busy: isTurnActive() || isPatActive(),
       callActive: isCallActive(),
       panel: `http://127.0.0.1:${pluginPort()}/panel`,

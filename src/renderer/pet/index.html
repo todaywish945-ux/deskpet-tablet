@@ -41,16 +41,10 @@
                 </button>
               </div>
 
-              <!-- 邀约页侧栏：联系人（在线状态） -->
+              <!-- 邀约页侧栏：联系人（在线状态）：一张卡一个角色，点击切换 -->
               <div id="side-video" class="hidden">
                 <div class="side-label">联系人</div>
-                <div class="video-contact">
-                  <img class="s-avatar" src="petasset://skin/avatar.png" alt="" draggable="false" />
-                  <div class="s-meta">
-                    <div class="t" id="video-contact-name">叶瞬光</div>
-                    <div class="online">在线<span class="o-dots">…</span></div>
-                  </div>
-                </div>
+                <div id="contact-cards"></div>
                 <div class="side-divider"><i></i><span>Info</span><i></i></div>
                 <div id="side-info">
                   发起邀约后她会以视频通话的形式接通
@@ -69,16 +63,7 @@
                   <button id="batch-delete" type="button" disabled>删除所选</button>
                   <button id="batch-cancel" type="button">完成</button>
                 </div>
-                <!-- 角色组头常驻（没有会话时也在，＋ 和爱心随时可点） -->
-                <div id="char-group-head" class="char-group-head">
-                  <img id="group-avatar" class="g-avatar" src="petasset://skin/avatar.png" alt="" draggable="false" />
-                  <span id="group-name" class="g-name">叶瞬光</span>
-                  <button id="profile-btn" class="g-heart" type="button" title="她记住的关于你">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.9-9.7-9.2C.7 8.6 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4L12 9l2-1.6C14.8 6.1 16.2 5 18.2 5c3.4 0 5.1 3.6 3.5 6.8C19.5 16.1 12 21 12 21z"/></svg>
-                  </button>
-                  <button id="new-session-btn" class="g-add" type="button" title="和她开个新会话">＋</button>
-                  <i id="group-chevron" class="g-chevron">▾</i>
-                </div>
+                <!-- 角色分组树：renderSessions 按 characterId 每个角色生成一张组头，会话行挂在各自组头下 -->
                 <div id="session-list"></div>
               </div>
 
@@ -99,7 +84,8 @@
               <!-- 聊天窗：常驻（ZZZ-Chat 式空态），直接打字聊（视频通话在邀约页和窗口按钮） -->
               <div id="session-view">
                 <div id="session-head">
-                  <svg class="head-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12.0016C2.0005 9.80922 2.72148 7.67774 4.05198 5.93522C5.38249 4.19269 7.24877 2.9357 9.3636 2.3577C11.4784 1.77969 13.7246 1.91271 15.7565 2.73628C17.7883 3.55984 19.4932 5.02831 20.6087 6.91569C21.7243 8.80307 22.1886 11.0047 21.9304 13.1819C21.6721 15.359 20.7055 17.391 19.1794 18.965C17.6533 20.539 15.6521 21.5678 13.484 21.8932C11.3159 22.2185 9.10092 21.8224 7.18 20.7656L3.292 21.9496C3.11858 22.0024 2.93407 22.0071 2.75819 21.9632C2.58231 21.9192 2.42168 21.8283 2.2935 21.7001C2.16531 21.5719 2.07438 21.4113 2.03043 21.2354C1.98648 21.0596 1.99117 20.875 2.044 20.7016L3.228 16.8076C2.42153 15.3342 1.9992 13.6813 2 12.0016Z"/></svg>
+                  <img id="session-char-avatar" class="head-avatar" src="petasset://skin/avatar.png" alt="" draggable="false" />
+                  <span id="session-char-name" class="head-char"></span>
                   <span id="session-title"></span>
                   <span id="session-when"></span>
                 </div>

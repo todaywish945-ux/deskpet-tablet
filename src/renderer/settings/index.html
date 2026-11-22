@@ -90,6 +90,7 @@
 
       <section>
         <h2>语音（说话的声音）</h2>
+        <p class="hint">带专属音色的角色会自动使用角色语音；下方通用音色设置仍保留，语音开关、语速和音量照常生效。</p>
         <label class="row">
           <span>启用语音</span>
           <input id="tts-enabled" type="checkbox" />
@@ -121,7 +122,6 @@
           </label>
           <div class="actions">
             <button id="enroll-btn" type="button">① 用参考音频注册克隆音色</button>
-            <button id="test-btn" type="button">② 试听</button>
           </div>
           <p class="hint">
             注册会用项目内置的叶瞬光参考音频（assets/voice/reference.mp3）在你自己的百炼账号里创建音色，
@@ -150,11 +150,14 @@
             <textarea id="gsv-ref-text" rows="3" placeholder="与参考音频说的一字不差，例如：…"></textarea>
           </label>
           <p class="hint">
-            先双击 GPT-SoVITS 整合包里的 <code>叶瞬光-语音.bat</code> 启动本地服务（首次启动要加载模型，等
-            控制台出现服务地址再试）。参考音频越贴近叶瞬光本人音色，克隆效果越好。
+            带专属音色的角色会自动使用独立本地服务，无需修改上面的通用配置；首次加载模型可能较慢。
+            通用音色请使用对应的 GPT-SoVITS 服务和 3~10 秒清晰参考音频。
           </p>
         </div>
 
+        <div class="actions">
+          <button id="test-btn" type="button">试听当前角色</button>
+        </div>
         <label>
           <span>语速（0.5 – 2）</span>
           <input id="tts-speed" type="number" min="0.5" max="2" step="0.05" />

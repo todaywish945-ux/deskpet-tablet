@@ -1,9 +1,7 @@
-import { join } from 'path'
 import { readFileSync, writeFileSync } from 'fs'
-import { app } from 'electron'
 import { LLMConfig } from '../../shared/types'
 import { streamChat } from './llm'
-import { loadSessions } from './store'
+import { loadSessions, characterStoreFile, activeSkinId } from './store'
 
 /**
  * 心情记录：每天用一次 LLM 给用户当天的心情打分 + 一句话概括；
@@ -24,13 +22,13 @@ interface MoodStore {
   lastReview?: string
 }
 
-function moodFile(): string {
-  return join(app.getPath('userData'), 'data', 'mood.json')
+function moodFile(skinId?: string): string {
+  return characterStoreFile('mood.json', skinId)
 }
 
-function loadMood(): MoodStore {
+function loadMood(skinId?: string): MoodStore {
   try {
-    const raw = JSON.parse(readFileSync(moodFile(), 'utf-8')) as MoodStore
+    const raw = JSON.parse(readFileSync(moodFile(skinId), 'utf-8')) as MoodStore
     if (Array.isArray(raw?.days)) return { days: raw.days, lastReview: raw.lastReview }
   } catch {
     // 首次使用
@@ -38,8 +36,8 @@ function loadMood(): MoodStore {
   return { days: [] }
 }
 
-function saveMood(store: MoodStore): void {
-  writeFileSync(moodFile(), JSON.stringify(store, null, 2), 'utf-8')
+function saveMood(store: MoodStore, skinId?: string): void {
+  writeFileSync(moodFile(skinId), JSON.stringify(store, null, 2), 'utf-8')
 }
 
 function today(): string {
@@ -52,26 +50,31 @@ const MOOD_SYSTEM =
   '只输出 JSON，不要解释。'
 
 let moodTimer: ReturnType<typeof setTimeout> | null = null
+/** 防抖排期时锁定的角色：10 分钟窗口内切了角色，心情也记到原角色名下 */
+let moodSkinId: string | null = null
 
 /** 对话后调度当天心情更新（10 分钟防抖，一天最多覆盖同一天的记录） */
-export function scheduleMoodUpdate(llm: LLMConfig): void {
+export function scheduleMoodUpdate(llm: LLMConfig, skinId?: string): void {
   if (moodTimer) clearTimeout(moodTimer)
+  moodSkinId = skinId || activeSkinId()
   moodTimer = setTimeout(() => {
     moodTimer = null
-    void runMoodUpdate(llm)
+    void runMoodUpdate(llm, moodSkinId ?? undefined)
+    moodSkinId = null
   }, 10 * 60_000)
 }
 
-async function runMoodUpdate(llm: LLMConfig): Promise<void> {
+async function runMoodUpdate(llm: LLMConfig, skinId?: string): Promise<void> {
   try {
-    // 收集今天所有会话里的真实发言
+    // 收集今天该角色会话里的真实发言（心情是"她眼中的你今天"，按角色分家）
     const start = new Date()
     start.setHours(0, 0, 0, 0)
     const lines: string[] = []
     for (const session of loadSessions().sessions) {
+      if ((session.characterId || 'yeshunguang') !== (skinId || activeSkinId())) continue
       for (const m of session.messages) {
         if (m.hidden || m.ts < start.getTime()) continue
-        lines.push(`${m.role === 'user' ? '用户' : '瞬光'}：${m.content}`)
+        lines.push(`${m.role === 'user' ? '用户' : '她'}：${m.content}`)
       }
     }
     const dialogue = lines.join('\n').slice(-3000)
@@ -95,7 +98,7 @@ async function runMoodUpdate(llm: LLMConfig): Promise<void> {
     const note = String(parsed.note ?? '').trim().slice(0, 40)
     if (!note) return
 
-    const store = loadMood()
+    const store = loadMood(skinId)
     const date = today()
     const existing = store.days.find((d) => d.date === date)
     if (existing) {
@@ -105,7 +108,7 @@ async function runMoodUpdate(llm: LLMConfig): Promise<void> {
       store.days.push({ date, score, note })
       while (store.days.length > 400) store.days.shift()
     }
-    saveMood(store)
+    saveMood(store, skinId)
   } catch (error) {
     console.error('[mood]', error)
   }
@@ -116,8 +119,8 @@ export interface WeeklyReview {
 }
 
 /** 攒够一周（近 7 天 ≥5 天有记录）才生成周回顾数据；不足返回 null */
-export function weeklyReviewData(): { days: MoodDay[]; thisWeekAvg: number; lastWeekAvg: number | null } | null {
-  const store = loadMood()
+export function weeklyReviewData(skinId?: string): { days: MoodDay[]; thisWeekAvg: number; lastWeekAvg: number | null } | null {
+  const store = loadMood(skinId)
   const now = Date.now()
   const week = store.days.filter((d) => now - new Date(`${d.date}T12:00:00`).getTime() <= 7 * 86_400_000)
   if (week.length < 5) return null
@@ -130,12 +133,12 @@ export function weeklyReviewData(): { days: MoodDay[]; thisWeekAvg: number; last
   return { days: week, thisWeekAvg, lastWeekAvg }
 }
 
-export function getLastReviewDate(): string | undefined {
-  return loadMood().lastReview
+export function getLastReviewDate(skinId?: string): string | undefined {
+  return loadMood(skinId).lastReview
 }
 
-export function markReviewed(): void {
-  const store = loadMood()
+export function markReviewed(skinId?: string): void {
+  const store = loadMood(skinId)
   store.lastReview = today()
-  saveMood(store)
+  saveMood(store, skinId)
 }

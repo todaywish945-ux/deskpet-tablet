@@ -14,6 +14,7 @@ const toastRow = document.getElementById('toast-row') as HTMLDivElement
 const bubbleAvatar = document.getElementById('bubble-avatar') as HTMLImageElement
 const waveform = document.getElementById('waveform') as HTMLElement
 const callLabel = document.getElementById('call-label') as HTMLElement
+const callName = document.querySelector('#statusbar .name') as HTMLSpanElement
 const form = document.getElementById('inputbar') as HTMLFormElement
 const input = document.getElementById('chat-input') as HTMLInputElement
 const sendBtn = document.getElementById('send-btn') as HTMLButtonElement
@@ -58,19 +59,15 @@ const impText = document.getElementById('imp-text') as HTMLDivElement
 const inviteBtn = document.getElementById('invite-btn') as HTMLButtonElement
 const inviteStar = document.getElementById('invite-star') as HTMLButtonElement | null
 const inviteName = document.getElementById('invite-name') as HTMLElement
-const videoContactName = document.getElementById('video-contact-name') as HTMLElement
 
-const profileBtn = document.getElementById('profile-btn') as HTMLButtonElement
 const profileCount = document.getElementById('profile-count') as HTMLSpanElement
 const profilePanel = document.getElementById('profile-panel') as HTMLDivElement
 const profileClose = document.getElementById('profile-close') as HTMLButtonElement
 const profileList = document.getElementById('profile-list') as HTMLDivElement
-// 敲敲侧栏：角色组头（头像/名字/爱心/＋新建/展开收起）
-const charGroupHead = document.getElementById('char-group-head') as HTMLDivElement
-const groupAvatar = document.getElementById('group-avatar') as HTMLImageElement
-const groupName = document.getElementById('group-name') as HTMLSpanElement
-const groupChevron = document.getElementById('group-chevron') as HTMLElement
-const newSessionBtn = document.getElementById('new-session-btn') as HTMLButtonElement
+// 敲敲侧栏：角色分组树（每个角色一张组头，头像/名字/爱心/＋新建/展开收起，renderSessions 动态生成）
+const contactCards = document.getElementById('contact-cards') as HTMLDivElement
+const sessionCharAvatar = document.getElementById('session-char-avatar') as HTMLImageElement
+const sessionCharName = document.getElementById('session-char-name') as HTMLElement
 
 const hangupBtn = document.getElementById('hangup-btn') as HTMLButtonElement
 const historyToggle = document.getElementById('history-toggle') as HTMLButtonElement
@@ -85,35 +82,47 @@ let player: AnimationPlayer | Live2DPlayer = new AnimationPlayer(
 const pcm = new PcmPlayer()
 let activeSkinId = ''
 let skinMeta: SkinMeta | null = null
+let skinRequest = 0
 
 /** 拉当前皮肤包并（重建）渲染器。id 没变则跳过；force=启动/手动 */
 async function applySkin(force = false): Promise<void> {
+  const request = ++skinRequest
   let meta: SkinMeta | null = null
   try {
     meta = (await (await fetch(`petasset://skin/skin.json?ts=${Date.now()}`)).json()) as SkinMeta
   } catch {
     // 主进程路由兜底 assets 根：旧布局也能跑
   }
-  if (!meta?.id) return
+  if (request !== skinRequest || !meta?.id) return
   if (!force && meta.id === activeSkinId) return
   activeSkinId = meta.id
   skinMeta = meta
-  const base = 'petasset://skin'
+  const base = `petasset://skins/${encodeURIComponent(meta.id)}`
   const container = document.getElementById('char-layer') as HTMLElement
-  container.innerHTML = '' // 清掉上一后端的 canvas/video/img
-  player.cancelFinishTimer()
-  clearSettlePoll()
-  player = meta.backend === 'live2d'
+  stopSpeech()
+  player.destroy()
+  container.innerHTML = ''
+  const nextPlayer = meta.backend === 'live2d'
     ? new Live2DPlayer(container, meta, base, () => pcm.level())
     : new AnimationPlayer(container, base)
+  player = nextPlayer
   avatarUrl = `${base}/${meta.avatar}`
-  bubbleAvatar.src = avatarUrl // 消息行头像跟随皮肤
+  bubbleAvatar.src = avatarUrl // 消息行头像随皮肤更新
+  const inviteAvatar = document.getElementById('invite-avatar') as HTMLImageElement
+  inviteAvatar.src = avatarUrl
   const charName = meta.name || '叶瞬光'
-  groupName.textContent = charName
-  groupAvatar.src = avatarUrl
-  videoContactName.textContent = charName // 邀约页联系人名
   inviteName.textContent = charName
-  renderSessions().catch(() => {}) // 会话树/会话卡头像也换新（重建时取 avatarUrl）
+  callName.textContent = charName
+  input.placeholder = `跟${charName}说点什么…`
+  renderSessions().catch(() => {}) // 会话树/联系人卡换新（组头头像用各自皮肤素材，当前组高亮跟着 activeSkinId 走）
+  renderContactCards().catch(() => {})
+  updateSessionCharBadge(currentSession?.characterId).catch(() => {})
+  if (!inviteView.classList.contains('hidden')) void loadImpression() // 邀约页开着时印象标题跟着换人
+  if (!force) {
+    // 换角色：聊天窗跟着换人——接上她最近一段会话，没有历史就空窗。
+    // 不做这一步的话，旧角色的会话还开着，新角色的回复会混进同一条对话里
+    void handoffSessionOnSwitch(meta.id).catch(() => {})
+  }
   const wp = document.getElementById('wallpaper') as HTMLImageElement
   if (meta.wallpaper) {
     wp.src = `${base}/${meta.wallpaper}`
@@ -122,15 +131,13 @@ async function applySkin(force = false): Promise<void> {
     wp.removeAttribute('src')
     wp.classList.add('hidden')
   }
-  await player.init()
+  await nextPlayer.init()
 }
 
 let workingText = ''
 /** 字幕模式已出的字：每句音频到达时由 pet:sentence 逐句追加，跟着声音走 */
 let revealedText = ''
 let shownEmotion: string | null = null
-/** 本轮是否真的播出过音频：合成失败时不播出场过渡 */
-let hadAudioThisTurn = false
 let userToastTimer: ReturnType<typeof setTimeout> | null = null
 let errorTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -374,91 +381,115 @@ api.on('pet:message', (payload) => {
   renderHistoryIfOpen()
 })
 
-// ---------- 说话状态看门狗 ----------
-
-/** 逐句合成的最大正常间隔：GSV 单句超时 60s + 重采样，90s 收不到任何语音事件才算卡死 */
 const TALK_WATCHDOG_MS = 90_000
 let talkWatchdogTimer: ReturnType<typeof setTimeout> | null = null
+let speechPollTimer: ReturnType<typeof setInterval> | null = null
+let speechTurn = 0
+let speechProducing = false
+let speechPreparing = false
+let speechReady = false
+let pendingAudio: string[] = []
 
-/** tts-end 迟迟不来（主进程卡在某个永不返回的请求上）时她会永远停在说话动画里，
- *  这里兜底强制收口回待机。正常情况下 tts-end / interrupt 会先把它清掉 */
-function armTalkWatchdog(): void {
+function clearTalkWatchdog(): void {
   if (talkWatchdogTimer) clearTimeout(talkWatchdogTimer)
-  talkWatchdogTimer = setTimeout(() => {
-    talkWatchdogTimer = null
-    if (!hadAudioThisTurn) return
+  talkWatchdogTimer = null
+}
+
+function clearSpeechPoll(): void {
+  if (speechPollTimer) clearInterval(speechPollTimer)
+  speechPollTimer = null
+}
+
+function syncSpeech(): void {
+  if (speechPreparing || pendingAudio.length > 0) return
+  if (!speechProducing && !pcm.busy) {
+    clearSpeechPoll()
+    speechReady = false
     waveform.classList.remove('on')
     callLabel.textContent = '视频通话中'
     player.finishTalkingAt(0)
+    return
+  }
+  if (!speechReady) return
+  if (player instanceof AnimationPlayer) player.setSpeechPaused(!pcm.playing)
+  waveform.classList.toggle('on', pcm.playing)
+  callLabel.textContent = pcm.playing ? '正在说话' : '等待语音'
+}
+
+function armTalkWatchdog(): void {
+  clearTalkWatchdog()
+  talkWatchdogTimer = setTimeout(() => {
+    talkWatchdogTimer = null
+    speechProducing = false
+    syncSpeech()
   }, TALK_WATCHDOG_MS)
 }
 
-function clearTalkWatchdog(): void {
-  if (talkWatchdogTimer) {
-    clearTimeout(talkWatchdogTimer)
-    talkWatchdogTimer = null
-  }
+function stopSpeech(): void {
+  speechTurn++
+  speechProducing = false
+  speechPreparing = false
+  speechReady = false
+  pendingAudio = []
+  pcm.stop()
+  clearTalkWatchdog()
+  clearSpeechPoll()
+  player.cancelFinishTimer()
+  player.finishTalkingAt(0)
+  waveform.classList.remove('on')
+  callLabel.textContent = '视频通话中'
 }
 
-api.on('pet:tts-preload', () => {
-  // 第一句开始合成：提前把要用的说话片段载入隐藏层，开口时零等待
-  player.preloadTalk()
-})
+api.on('pet:tts-preload', () => player.preloadTalk())
 
 api.on('pet:tts-start', () => {
-  waveform.classList.add('on')
-  callLabel.textContent = '正在说话'
-  hadAudioThisTurn = false
-  player.setTalking(true)
+  clearSpeechPoll()
+  speechProducing = true
+  callLabel.textContent = '等待语音'
   armTalkWatchdog()
+  speechPollTimer = setInterval(syncSpeech, 20)
 })
 
 api.on('pet:tts-chunk', (chunk) => {
-  hadAudioThisTurn = true
-  pcm.pushChunk(String(chunk))
-  armTalkWatchdog() // 每块音频都重新计时；90s 一个事件都没有说明主进程卡住了
+  speechProducing = true
+  if (!speechPollTimer) speechPollTimer = setInterval(syncSpeech, 20)
+  armTalkWatchdog()
+  if (speechReady) {
+    pcm.pushChunk(String(chunk))
+    return
+  }
+  pendingAudio.push(String(chunk))
+  if (speechPreparing) return
+  speechPreparing = true
+  const turn = speechTurn
+  player.resumeAll()
+  const ready = player instanceof AnimationPlayer
+    ? player.startTalking()
+    : (player.setTalking(true), Promise.resolve(true))
+  void ready.then((started) => {
+    if (turn !== speechTurn) return
+    speechPreparing = false
+    if (!started) {
+      stopSpeech()
+      return
+    }
+    speechReady = true
+    for (const data of pendingAudio) pcm.pushChunk(data)
+    pendingAudio = []
+    syncSpeech()
+  })
 })
 
 api.on('pet:interrupt', () => {
-  // 被新消息打断：清音频/文字缓存和未触发的收口，画面由新回复的说话动画接管
-  pcm.stop()
+  stopSpeech()
   workingText = ''
   revealedText = ''
-  hadAudioThisTurn = false
-  clearTalkWatchdog()
-  player.cancelFinishTimer()
-  clearSettlePoll()
 })
-
-  // 收口轮询：tts-end 后每 250ms 读真实剩余音频，≤450ms 或已停播才收口。
-  // AudioContext 挂起/漂移时 remaining 不再下降，轮询自动推迟——长句不会被提前
-  // 掐进待机，停播也不会停在尾帧假死。
-  let settlePollTimer: ReturnType<typeof setInterval> | null = null
-  function clearSettlePoll(): void {
-    if (settlePollTimer) {
-      clearInterval(settlePollTimer)
-      settlePollTimer = null
-    }
-  }
 
 api.on('pet:tts-end', () => {
   clearTalkWatchdog()
-  waveform.classList.remove('on')
-  callLabel.textContent = '视频通话中'
-  if (!hadAudioThisTurn) {
-    // 本轮从未出声（合成失败等）：直接回待机，不播出场过渡
-    player.setTalking(false)
-    return
-  }
-  // 收口倒排：按音频时间线还剩多久播完，提前留出过渡，语音结束瞬间正好闭嘴过渡到待机
-  clearSettlePoll()
-  settlePollTimer = setInterval(() => {
-    const rem = pcm.remainingMs
-    if (!pcm.busy || !Number.isFinite(rem) || rem <= 450) {
-      clearSettlePoll()
-      player.finishTalkingAt(Math.max(0, rem))
-    }
-  }, 250)
+  speechProducing = false
+  syncSpeech()
 })
 
 api.on('pet:tts-error', (message) => {
@@ -500,7 +531,7 @@ api.on('pet:bridge-audio-sink', (on) => {
 
 /** 主进程闲置计时到点请求收起平板：守卫不过（她在播）静默忽略，主进程稍后重试 */
 api.on('pet:tablet-hide-request', () => {
-  if (pcm.busy) return
+  if (speechProducing || speechPreparing || speechReady || pcm.busy) return
   player.pauseAll()
   void api.applyTabletHide()
 })
@@ -541,6 +572,53 @@ function formatTime(ts: number): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${hm}`
 }
 
+// ---------- 页面内确认弹窗（替代 window.confirm）----------
+// 原生 confirm 是系统模态框，会抢走 OS 焦点 → 平板触发 blur → 120ms 沉底
+// 计时把窗口压到 Z 序最底（点删除=整块退后台）。自绘弹窗不产生焦点转移。
+function qqConfirm(message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div')
+    overlay.className = 'qq-confirm-overlay'
+    const card = document.createElement('div')
+    card.className = 'qq-confirm-card'
+    const text = document.createElement('div')
+    text.className = 'qq-confirm-text'
+    text.textContent = message
+    const row = document.createElement('div')
+    row.className = 'qq-confirm-row'
+    const cancel = document.createElement('button')
+    cancel.className = 'qq-confirm-btn'
+    cancel.type = 'button'
+    cancel.textContent = '取消'
+    const ok = document.createElement('button')
+    ok.className = 'qq-confirm-btn danger'
+    ok.type = 'button'
+    ok.textContent = '删除'
+    row.append(cancel, ok)
+    card.append(text, row)
+    overlay.append(card)
+
+    let settled = false
+    const close = (result: boolean): void => {
+      if (settled) return
+      settled = true
+      document.removeEventListener('keydown', onKey)
+      overlay.remove()
+      resolve(result)
+    }
+    const onKey = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') close(false)
+    }
+    cancel.addEventListener('click', () => close(false))
+    ok.addEventListener('click', () => close(true))
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay) close(false)
+    })
+    document.addEventListener('keydown', onKey)
+    document.body.appendChild(overlay)
+  })
+}
+
 // ---------- 会话批量删除 ----------
 let batchMode = false
 const selectedSessions = new Set<string>()
@@ -578,105 +656,294 @@ batchSelectAllBtn.addEventListener("click", () => {
 batchDeleteBtn.addEventListener("click", () => {
   const ids = [...selectedSessions]
   if (ids.length === 0) return
-  if (!window.confirm(`删除选中的 ${ids.length} 个会话？（不可恢复）`)) return
-  void api.deleteSessions(ids).then(() => {
-    if (currentSession && ids.includes(currentSession.id)) resetComposer()
-    selectedSessions.clear()
-    updateBatchBar()
-    void renderSessions()
+  void qqConfirm(`删除选中的 ${ids.length} 个会话？（不可恢复）`).then((ok) => {
+    if (!ok) return
+    void api.deleteSessions(ids).then(() => {
+      if (currentSession && ids.includes(currentSession.id)) resetComposer()
+      selectedSessions.clear()
+      updateBatchBar()
+      void renderSessions()
+    })
   })
 })
 
-// 角色分组展开状态（智谱任务列表式：角色行下拉直接挂会话）
-let charGroupExpanded = true
+// 角色分组展开状态（智谱任务列表式：角色行下拉直接挂会话），每个角色各记一份
+const charGroupExpanded = new Map<string, boolean>()
 
-/** 组头只有一份静态 DOM：这里只同步展开态，列表重建不会带走 ＋/爱心的监听 */
-function syncGroupHead(): void {
-  groupChevron.textContent = charGroupExpanded ? '▾' : '▸'
-  charGroupHead.classList.toggle('collapsed', !charGroupExpanded)
+/** 已知角色清单（分组树/联系人卡/会话头共用）：拉一次缓存住，渲染各处取用 */
+let skinsCache: { id: string; name: string; avatar?: string }[] = []
+
+async function refreshSkins(): Promise<{ id: string; name: string; avatar?: string }[]> {
+  try {
+    skinsCache = ((await api.listSkins()) ?? []) as { id: string; name: string; avatar?: string }[]
+  } catch {
+    // 拉不到沿用旧缓存
+  }
+  return skinsCache
 }
 
-charGroupHead.addEventListener('click', () => {
-  charGroupExpanded = !charGroupExpanded
-  syncGroupHead()
-  void renderSessions()
-})
+function skinById(id?: string | null): { id: string; name: string; avatar?: string } | null {
+  if (!id) return null
+  return skinsCache.find((skin) => skin.id === id) ?? null
+}
 
-async function renderSessions(): Promise<void> {
-  const store = await api.listSessions()
-  sessionList.innerHTML = ''
-  syncGroupHead()
-  if (!charGroupExpanded) return
-  if (store.sessions.length === 0) {
-    const empty = document.createElement('div')
-    empty.className = 'empty'
-    empty.textContent = '还没有会话\n点上面的 ＋ 开个新话题'
-    sessionList.appendChild(empty)
-    return
+function skinAvatarSrc(skin: { id: string; avatar?: string }): string {
+  return `petasset://skins/${encodeURIComponent(skin.id)}/${skin.avatar || 'avatar.png'}`
+}
+
+/** 切换角色：主进程整切（人设/动画/语音一起换），成功后本地立即同步一次，不等广播事件 */
+async function activateCharacter(skinId: string): Promise<boolean> {
+  if (!skinId || skinId === activeSkinId) return false
+  const ok = await api.charActivate(skinId)
+  if (ok) await applySkin()
+  return ok
+}
+
+const HEART_SVG =
+  '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.9-9.7-9.2C.7 8.6 2.4 5 5.8 5c2 0 3.4 1.1 4.2 2.4L12 9l2-1.6C14.8 6.1 16.2 5 18.2 5c3.4 0 5.1 3.6 3.5 6.8C19.5 16.1 12 21 12 21z"/></svg>'
+
+/** 一张角色组头：头像/名字点击切换角色，＋ 给这个角色开新会话，爱心（仅当前角色有）开档案面板 */
+function buildGroupHead(skin: { id: string; name: string; avatar?: string }, isActive: boolean): HTMLDivElement {
+  const head = document.createElement('div')
+  head.className = 'char-group-head' + (isActive ? ' active' : '')
+  head.dataset.skin = skin.id
+
+  const avatar = document.createElement('img')
+  avatar.className = 'g-avatar'
+  avatar.src = skinAvatarSrc(skin)
+  avatar.alt = ''
+  avatar.draggable = false
+  const name = document.createElement('span')
+  name.className = 'g-name'
+  name.textContent = skin.name || skin.id
+  head.append(avatar, name)
+
+  if (isActive) {
+    const heart = document.createElement('button')
+    heart.className = 'g-heart'
+    heart.type = 'button'
+    heart.title = '她记住的关于你'
+    heart.innerHTML = HEART_SVG
+    heart.addEventListener('click', (event) => {
+      event.stopPropagation()
+      void openProfilePanel()
+    })
+    head.appendChild(heart)
   }
 
-  // 单角色阶段所有会话都挂当前皮肤角色组下；后续给 session 加 characterId 即成真分组
-  for (const session of store.sessions) {
-    const item = document.createElement('div')
-    item.className = 'session-item' + (session.id === currentSession?.id ? ' active' : '')
-    item.dataset.sid = session.id
-    if (batchMode && selectedSessions.has(session.id)) item.classList.add('batch-sel')
+  const add = document.createElement('button')
+  add.className = 'g-add'
+  add.type = 'button'
+  add.title = `和${skin.name || '她'}开个新会话`
+  add.textContent = '＋'
+  add.addEventListener('click', (event) => {
+    event.stopPropagation()
+    void startNewSession(skin.id)
+  })
 
-    // 微信式会话行：标题 + 最后一句预览 + 时间（角色头像在组头上，行内不再重复）
-    const meta = document.createElement('div')
-    meta.className = 's-meta'
-    const title = document.createElement('div')
-    title.className = 't'
-    title.textContent = session.title || '新的对话'
-    const lastVisible = [...session.messages].reverse().find((m: ChatMessage) => !m.hidden)
-    const preview = document.createElement('div')
-    preview.className = 'p'
-    preview.textContent = lastVisible
-      ? lastVisible.content.trim()
-      : session.topic
-        ? `话题：${session.topic}`
-        : '还没开始聊'
-    const time = document.createElement('div')
-    time.className = 'time'
-    time.textContent = formatTime(session.updatedAt)
-    meta.append(title, preview, time)
-    const del = document.createElement('button')
-    del.className = 'del'
-    del.type = 'button'
-    del.textContent = '×'
-    del.title = '删除会话'
+  const chevron = document.createElement('i')
+  chevron.className = 'g-chevron'
+  const expanded = charGroupExpanded.get(skin.id) ?? true
+  chevron.textContent = expanded ? '▾' : '▸'
+  chevron.addEventListener('click', (event) => {
+    event.stopPropagation()
+    charGroupExpanded.set(skin.id, !expanded)
+    void renderSessions()
+  })
 
-    if (batchMode) {
-      // 批量模式：点击条目=切换选中，单个 × 按钮隐藏
-      item.addEventListener('click', () => {
-        if (selectedSessions.has(session.id)) selectedSessions.delete(session.id)
-        else selectedSessions.add(session.id)
-        item.classList.toggle('batch-sel', selectedSessions.has(session.id))
-        updateBatchBar()
-      })
-      item.append(meta)
-    } else {
-      item.append(meta, del)
-      item.addEventListener('click', () => void selectSession(session.id))
-      del.addEventListener('click', (event) => {
-        event.stopPropagation()
-        if (!window.confirm(`删除会话「${session.title || '新的对话'}」？`)) return
+  head.append(add, chevron)
+  head.addEventListener('click', () => {
+    // 点别的角色 = 整体切过去（顺带展开）；点当前角色 = 收起/展开会话列表
+    if (!isActive) {
+      charGroupExpanded.set(skin.id, true)
+      void activateCharacter(skin.id)
+      return
+    }
+    charGroupExpanded.set(skin.id, !(charGroupExpanded.get(skin.id) ?? true))
+    void renderSessions()
+  })
+  return head
+}
+
+/** 一条会话行：标题 + 最后一句预览 + 时间（角色头像在组头上，行内不再重复） */
+function buildSessionRow(session: ChatSession): HTMLDivElement {
+  const item = document.createElement('div')
+  item.className = 'session-item' + (session.id === currentSession?.id ? ' active' : '')
+  item.dataset.sid = session.id
+  if (batchMode && selectedSessions.has(session.id)) item.classList.add('batch-sel')
+
+  const meta = document.createElement('div')
+  meta.className = 's-meta'
+  const title = document.createElement('div')
+  title.className = 't'
+  title.textContent = session.title || '新的对话'
+  const lastVisible = [...session.messages].reverse().find((m: ChatMessage) => !m.hidden)
+  const preview = document.createElement('div')
+  preview.className = 'p'
+  preview.textContent = lastVisible
+    ? lastVisible.content.trim()
+    : session.topic
+      ? `话题：${session.topic}`
+      : '还没开始聊'
+  const time = document.createElement('div')
+  time.className = 'time'
+  time.textContent = formatTime(session.updatedAt)
+  meta.append(title, preview, time)
+  const del = document.createElement('button')
+  del.className = 'del'
+  del.type = 'button'
+  del.textContent = '×'
+  del.title = '删除会话'
+
+  if (batchMode) {
+    // 批量模式：点击条目=切换选中，单个 × 按钮隐藏
+    item.addEventListener('click', () => {
+      if (selectedSessions.has(session.id)) selectedSessions.delete(session.id)
+      else selectedSessions.add(session.id)
+      item.classList.toggle('batch-sel', selectedSessions.has(session.id))
+      updateBatchBar()
+    })
+    item.append(meta)
+  } else {
+    item.append(meta, del)
+    item.addEventListener('click', () => void selectSession(session.id))
+    del.addEventListener('click', (event) => {
+      event.stopPropagation()
+      void qqConfirm(`删除会话「${session.title || '新的对话'}」？`).then((ok) => {
+        if (!ok) return
         void api.deleteSession(session.id).then(() => {
           if (currentSession?.id === session.id) resetComposer()
           void renderSessions()
         })
       })
-    }
-    sessionList.appendChild(item)
+    })
   }
+  return item
+}
+
+async function renderSessions(): Promise<void> {
+  const [store, skins] = await Promise.all([api.listSessions(), refreshSkins()])
+  const activeId = activeSkinId || skins[0]?.id || 'yeshunguang'
+  sessionList.innerHTML = ''
+
+  // 按角色分组：旧数据没有 characterId 的挂当前角色名下；归属皮肤被删的并入当前组（不丢数据）
+  const groups: { skin: { id: string; name: string; avatar?: string }; sessions: ChatSession[] }[] = skins.map(
+    (skin: { id: string; name: string; avatar?: string }) => ({ skin, sessions: [] })
+  )
+  const byId = new Map(groups.map((group) => [group.skin.id, group]))
+  if (!byId.has(activeId)) {
+    const fallback = { skin: { id: activeId, name: activeId }, sessions: [] as ChatSession[] }
+    groups.push(fallback)
+    byId.set(activeId, fallback)
+  }
+  for (const session of store.sessions) {
+    const id = session.characterId && byId.has(session.characterId) ? session.characterId : activeId
+    byId.get(id)!.sessions.push(session)
+  }
+
+  for (const group of groups) {
+    sessionList.appendChild(buildGroupHead(group.skin, group.skin.id === activeId))
+    if (!(charGroupExpanded.get(group.skin.id) ?? true)) continue
+    if (group.sessions.length === 0) {
+      if (group.skin.id !== activeId) continue
+      const empty = document.createElement('div')
+      empty.className = 'empty'
+      empty.textContent = '还没有会话\n点上面的 ＋ 开个新话题'
+      sessionList.appendChild(empty)
+      continue
+    }
+    for (const session of group.sessions) sessionList.appendChild(buildSessionRow(session))
+  }
+  syncProfileBadge()
 }
 
 async function selectSession(id: string): Promise<void> {
   const session: ChatSession | null = await api.openSession(id)
   if (!session) return
+  // 点了别的角色的会话：先整体切到那个角色（人设/动画/语音一起换），再展示这段对话
+  if (session.characterId && session.characterId !== activeSkinId) {
+    await activateCharacter(session.characterId)
+  }
   currentSession = session
   showSessionView(session)
   await renderSessions()
+}
+
+/** 换角色后聊天窗跟着换人：接上她最近一段会话，没有历史就空窗（下一条消息给她建档）。
+ *  主进程 activeSessionId 一并对齐，否则新角色的消息会落进旧角色的会话（对话串台） */
+async function handoffSessionOnSwitch(skinId: string): Promise<void> {
+  const belongs = (session: ChatSession): boolean => (session.characterId || 'yeshunguang') === skinId
+  if (currentSession && belongs(currentSession)) return // 跨角色点会话进来时已经切好了
+  const store = await api.listSessions()
+  const latest = [...store.sessions].filter(belongs).sort((a, b) => b.updatedAt - a.updatedAt)[0]
+  if (latest) {
+    const session = await api.openSession(latest.id)
+    if (!session) return
+    currentSession = session
+    showSessionView(session)
+  } else {
+    await api.openSession('') // 清主进程活跃会话：下一条消息现场给她建档
+    currentSession = null
+    removeHomeLive()
+    sessionTitleEl.textContent = ''
+    sessionWhenEl.textContent = ''
+    updateSessionCharBadge().catch(() => {})
+    renderEmptyPreview()
+  }
+}
+
+/** 邀约页联系人卡：一张卡一个角色，点击切换（右侧大卡/话题/通话跟当前角色走） */
+async function renderContactCards(): Promise<void> {
+  const skins = await refreshSkins()
+  contactCards.innerHTML = ''
+  for (const skin of skins) {
+    const card = document.createElement('div')
+    card.className = 'video-contact' + (skin.id === activeSkinId ? ' active' : '')
+    card.dataset.skin = skin.id
+    const avatar = document.createElement('img')
+    avatar.className = 's-avatar'
+    avatar.src = skinAvatarSrc(skin)
+    avatar.alt = ''
+    avatar.draggable = false
+    const meta = document.createElement('div')
+    meta.className = 's-meta'
+    const name = document.createElement('div')
+    name.className = 't'
+    name.textContent = skin.name || skin.id
+    const online = document.createElement('div')
+    online.className = 'online'
+    online.innerHTML =
+      skin.id === activeSkinId
+        ? '使用中<span class="o-dots">…</span>'
+        : '在线<span class="o-dots">…</span>'
+    meta.append(name, online)
+    card.append(avatar, meta)
+    card.addEventListener('click', () => {
+      void activateCharacter(skin.id)
+    })
+    contactCards.appendChild(card)
+  }
+}
+
+/** 会话头左侧的角色标识：这段对话属于谁就显示谁（跨角色点会话后自动正确） */
+async function updateSessionCharBadge(characterId?: string): Promise<void> {
+  if (skinsCache.length === 0) await refreshSkins()
+  const skin = skinById(characterId || activeSkinId)
+  if (!skin) {
+    sessionCharAvatar.classList.add('hidden')
+    sessionCharName.textContent = ''
+    return
+  }
+  sessionCharAvatar.src = skinAvatarSrc(skin)
+  sessionCharAvatar.classList.remove('hidden')
+  sessionCharName.textContent = skin.name || skin.id
+}
+
+/** 档案爱心徽标挂在当前角色的组头上，重建列表后按最近状态补挂 */
+let profileHasFacts = false
+function syncProfileBadge(): void {
+  const heart = sessionList.querySelector<HTMLElement>('.char-group-head.active .g-heart')
+  heart?.classList.toggle('has-facts', profileHasFacts)
 }
 
 let avatarUrl = 'petasset://skin/avatar.png'
@@ -803,6 +1070,7 @@ function showSessionView(session: ChatSession): void {
   applyTabMain()
   sessionTitleEl.textContent = session.title || '新的对话'
   sessionWhenEl.textContent = formatTime(session.updatedAt)
+  updateSessionCharBadge(session.characterId).catch(() => {}) // 会话头角色标识：这段对话属于谁
 
   sessionPreview.innerHTML = ''
   removeHomeLive() // 重建列表：上一轮的 live 气泡节点已随 innerHTML 消失，指针同步作废
@@ -835,11 +1103,14 @@ function resetComposer(): void {
   switchTab('chat')
   sessionTitleEl.textContent = ''
   sessionWhenEl.textContent = ''
+  updateSessionCharBadge().catch(() => {}) // 空窗期标识回到当前角色
   renderEmptyPreview()
 }
 
-/** ＋：开一个新话题并当场切过去——右侧换成空聊天窗，左侧新行亮一下 */
-async function startNewSession(): Promise<void> {
+/** ＋：开一个新话题并当场切过去——右侧换成空聊天窗，左侧新行亮一下。
+ *  从别的角色的组头点 ＋：先整体切到那个角色（会话归属由主进程按当前皮肤盖章） */
+async function startNewSession(forSkinId?: string): Promise<void> {
+  if (forSkinId && forSkinId !== activeSkinId) await activateCharacter(forSkinId)
   // 已经停在一条还没开口的会话上就直接复用，免得连点堆出一排空会话
   const session =
     currentSession && currentSession.messages.length === 0
@@ -847,7 +1118,7 @@ async function startNewSession(): Promise<void> {
       : await api.createSession('')
   if (!session) return
   currentSession = session
-  charGroupExpanded = true
+  charGroupExpanded.set(activeSkinId, true)
   switchTab('chat')
   showSessionView(session)
   await renderSessions()
@@ -859,11 +1130,6 @@ async function startNewSession(): Promise<void> {
   homeChatInput.value = ''
   homeChatInput.focus()
 }
-
-newSessionBtn.addEventListener('click', (event) => {
-  event.stopPropagation() // 别顺带把角色组收起来
-  void startNewSession()
-})
 
 // 换形象入口在设置窗口（底部「设置」按钮）
 
@@ -961,7 +1227,8 @@ async function refreshProfileCount(): Promise<void> {
   const profile = await api.getProfile()
   profileCount.textContent = `${profile.facts.length} 条`
   profileCount.classList.toggle('hidden', profile.facts.length === 0)
-  profileBtn.classList.toggle('has-facts', profile.facts.length > 0)
+  profileHasFacts = profile.facts.length > 0
+  syncProfileBadge()
 }
 
 async function openProfilePanel(): Promise<void> {
@@ -1006,10 +1273,6 @@ async function openProfilePanel(): Promise<void> {
   }
 }
 
-profileBtn.addEventListener('click', (event) => {
-  event.stopPropagation() // 爱心在组头里：别顺带把角色组收起来
-  void openProfilePanel()
-})
 profileClose.addEventListener('click', () => {
   profilePanel.classList.add('hidden')
   applyTabMain()
@@ -1036,9 +1299,7 @@ function showView(view: 'home' | 'call'): void {
 /** 挂断：停播报，回主界面并刷新这段会话（挂断按钮与控制桥 pet:call-end 共用） */
 function hangup(): void {
   void api.stop()
-  pcm.stop()
-  player.cancelFinishTimer()
-  clearSettlePoll()
+  stopSpeech()
   waveform.classList.remove('on')
   callLabel.textContent = '视频通话中'
   showView('home')
@@ -1126,7 +1387,7 @@ form.addEventListener('submit', (event) => {
   event.preventDefault()
   const text = input.value.trim()
   if (!text) return
-  pcm.stop() // 她还在说上一句时直接切到新对话
+  stopSpeech()
   // 发送成功才清空：主进程重启/热更新导致 invoke 失败时，把字还回输入框并提示，
   // 不然就是"点发送直接消失、她根本没收到"
   api

@@ -1,8 +1,9 @@
 import { BrowserWindow } from 'electron'
-import { AppConfig, ChatMessage, EMOTION_TAG_RE, EMOTIONS } from '../../shared/types'
+import { AppConfig, ChatMessage, EMOTION_TAG_RE, EMOTIONS, TTSConfig } from '../../shared/types'
 import { streamChat, systemPrompt } from './llm'
 import { synthesizePcm, isTtsReady, TTSError } from './tts'
-import { loadSessions, saveSessions, newSession, truncate, activeSkinDir } from './store'
+import { waitForGsvOnline } from './gsv'
+import { loadSessions, saveSessions, newSession, truncate, activeSkinDir, resolveTtsConfig, loadConfig } from './store'
 import { profilePrompt, updateProfileFromConversation, dialogueForExtraction } from './profile'
 import { recallForTurn, scheduleSummary } from './memory'
 import { scheduleMoodUpdate } from './mood'
@@ -152,6 +153,16 @@ export async function runTurn(options: TurnOptions): Promise<void> {
   cancelPat(send) // 摸头反应还在说：直接切到新对话
   // 平板收成灵动岛时不弹出：岛窗口会收到这批事件（弹跳 + 状态点 + 最近消息）
 
+  let ttsConfig: TTSConfig
+  try {
+    ttsConfig = resolveTtsConfig(options.config)
+  } catch (error) {
+    send('pet:tts-error', (error as Error).message)
+    send('pet:state', 'idle')
+    options.onEnd?.()
+    return
+  }
+
   const abort = new AbortController()
   activeTurn = { abort }
 
@@ -190,13 +201,15 @@ export async function runTurn(options: TurnOptions): Promise<void> {
 
   const splitter = new SentenceSplitter()
   let firstSentenceRevealed = false // 首句不等音频：LLM 慢时先让字出来
+  /** 字声同步：本轮首句合成前等过语音服务就绪（冷启动窗口内开口时，字和声一起出） */
+  let voiceServiceWaited = false
   let full = ''
   let speaking = false
   let speakStartAt = 0
   let emotionSent = false
   /** 本轮是否真的播出了音频：有音频时说话动画完全跟音频走 */
   let audioStarted = false
-  const ttsReady = isTtsReady(options.config.tts)
+  const ttsReady = isTtsReady(ttsConfig)
   /** 字幕模式（配了语音）：文字不随 LLM 流式上屏，等这句的音频到达才出字——边说边吐字。
       一次性播报同样按句出字：它的句子是灵动岛胶囊/卡片的消息来源，没配语音也得有 */
   const subtitleMode = ttsReady || ephemeral
@@ -212,6 +225,7 @@ export async function runTurn(options: TurnOptions): Promise<void> {
   }
 
   const speak = async (sentence: string): Promise<void> => {
+    if (abort.signal.aborted) return
     const clean = sentence.replace(EMOTION_TAG_RE, '').trim()
     if (!clean) return
     if (!SPEAKABLE.test(clean)) {
@@ -233,6 +247,14 @@ export async function runTurn(options: TurnOptions): Promise<void> {
       send('pet:sentence', clean, estimate)
     }
     try {
+      // 字声同步：语音服务还在冷启动（刚切角色/刚拉起）时，首句先等服务在线再出字，
+      // 避免"字先出、声音一分钟后才响"的不同步；等待期间界面停在 thinking 态。
+      // 只等本轮第一句，之后服务已在线直接过；上限 150s，超时交还给合成路径正常报错
+      if (!voiceServiceWaited) {
+        voiceServiceWaited = true
+        const waitedMs = await waitForGsvOnline(ttsConfig, 150_000, abort.signal)
+        if (waitedMs > 2000) console.log(`[tts] 语音服务冷启动，等待 ${Math.round(waitedMs / 1000)}s 后开始合成`)
+      }
       // 合成要花两三秒：提前让渲染层把要用的说话片段载好，声音一响嘴立即跟上
       send('pet:tts-preload')
       // 首句抢跑：不等音频（TTS 合成还要 1~3 秒，智谱慢的时候 LLM 本身就几十秒），
@@ -241,7 +263,7 @@ export async function runTurn(options: TurnOptions): Promise<void> {
         firstSentenceRevealed = true
         reveal()
       }
-      await synthesizePcm(options.config.tts, clean, {
+      await synthesizePcm(ttsConfig, clean, {
         signal: abort.signal,
         onChunk: (pcm) => {
           if (!audioStarted) {
@@ -292,11 +314,16 @@ export async function runTurn(options: TurnOptions): Promise<void> {
 [梗百科] ${guide}`
     }
     // 每轮注入：人设（随皮肤）+ 梗百科 + 档案记忆 + 语义召回的旧回忆 + DSH 实时动态（用户问"他在干嘛"时她照着讲）
+    // 档案/回忆按会话归属角色取（记忆分家后每个角色只认识自己听说过的你）
+    const sessionRecord = options.sessionId
+      ? loadSessions().sessions.find((s) => s.id === options.sessionId)
+      : undefined
+    const sessionSkin = sessionRecord?.characterId
     const system =
       systemPrompt(activeSkinDir(options.config)) +
       memeBlock +
-      profilePrompt() +
-      (ephemeral ? '' : await recallForTurn(options.config.llm, options.text ?? '', options.sessionId ?? '')) +
+      profilePrompt(sessionSkin) +
+      (ephemeral ? '' : await recallForTurn(options.config.llm, options.text ?? '', options.sessionId ?? '', sessionSkin)) +
       dshActivityPrompt()
     const streamed = await streamChat({
       config: options.config.llm,
@@ -340,7 +367,7 @@ export async function runTurn(options: TurnOptions): Promise<void> {
     if (session && options.sessionId) {
       scheduleProfileExtraction(options.sessionId, options.config.llm)
       scheduleSummary(options.sessionId, options.config.llm)
-      scheduleMoodUpdate(options.config.llm)
+      scheduleMoodUpdate(options.config.llm, session.characterId) // 心情记到会话角色名下
     }
 
     // 字幕模式下正文由 pet:sentence 逐句出过了，这里只带情绪，避免整段文字瞬间跳出来
@@ -445,12 +472,13 @@ export async function petPat(petWindow: BrowserWindow | null, config: AppConfig,
   }
 
   try {
+    const ttsConfig = resolveTtsConfig(config)
     send('pet:state', 'thinking') // 重置字幕缓冲，气泡先出思考点
     send('pet:emotion', emotion)
-    if (isTtsReady(config.tts)) {
+    if (isTtsReady(ttsConfig)) {
       send('pet:tts-preload')
       try {
-        await synthesizePcm(config.tts, line, {
+        await synthesizePcm(ttsConfig, line, {
           signal: signal.signal,
           onChunk: (pcm) => {
             if (!audioStarted) {
@@ -482,20 +510,27 @@ export async function petPat(petWindow: BrowserWindow | null, config: AppConfig,
       })
     }
     persistExchange(zone === 'head' ? '（用户摸了摸你的头）' : '（用户点了点你的屏幕）', line, emotion, send)
+  } catch (error) {
+    send('pet:tts-error', (error as Error).message)
   } finally {
     const cancelled = signal.signal.aborted
-    patAbort = null
+    if (patAbort === signal) patAbort = null // 旧角色收尾不能清掉新角色正在播报的取消句柄
     if (!cancelled) send('pet:tts-end')
   }
 }
 
-/** 把「隐藏用户消息 + 真实回复」的形状写进最近的会话，保持上下文连贯（摸头反应 / 插件播报共用） */
+/** 把「隐藏用户消息 + 真实回复」的形状写进最近的会话，保持上下文连贯（摸头反应 / 插件播报共用）。
+ *  只写当前角色的会话：活动 id 挂着别角色的旧会话时按角色取最近，避免串台 */
 function persistExchange(hiddenUser: string, line: string, emotion: string, send?: PetSend): void {
   try {
     const store = loadSessions()
+    const skin = loadConfig().character?.skin || 'yeshunguang'
+    const activeId = getActiveSessionId()
     const session =
-      store.sessions.find((s) => s.id === getActiveSessionId()) ??
-      [...store.sessions].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+      store.sessions.find((s) => s.id === activeId && (s.characterId || 'yeshunguang') === skin) ??
+      [...store.sessions]
+        .filter((s) => (s.characterId || 'yeshunguang') === skin)
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0]
     if (!session) return
     const hiddenMessage: ChatMessage = {
       role: 'user',
@@ -552,12 +587,13 @@ export async function petSay(options: PetSayOptions): Promise<{ ok: boolean; bus
   }
 
   try {
+    const ttsConfig = resolveTtsConfig(options.config)
     send('pet:state', 'thinking') // 重置字幕缓冲，气泡先出思考点
     send('pet:emotion', emotion)
-    if (isTtsReady(options.config.tts)) {
+    if (isTtsReady(ttsConfig)) {
       send('pet:tts-preload')
       try {
-        await synthesizePcm(options.config.tts, text, {
+        await synthesizePcm(ttsConfig, text, {
           signal: signal.signal,
           onChunk: (pcm) => {
             if (!audioStarted) {
@@ -590,20 +626,33 @@ export async function petSay(options: PetSayOptions): Promise<{ ok: boolean; bus
     }
     persistExchange('（编程助手让你向用户播报这条消息，你照说了）', text, emotion)
     return { ok: true, spoken: true }
+  } catch (error) {
+    send('pet:tts-error', (error as Error).message)
+    return { ok: false, spoken: false }
   } finally {
     const cancelled = signal.signal.aborted
-    patAbort = null
+    if (patAbort === signal) patAbort = null // 旧角色收尾不能清掉新角色正在播报的取消句柄
     if (!cancelled) send('pet:tts-end')
   }
 }
 
 // ---------- 控制桥聊天（外部 agent 以正常用户消息跑一轮，拿回她的回复文本） ----------
 
-/** 有活动会话就用，没有就新建（与 pet:send 的兜底一致），返回会话 id */
+/** 有活动会话就用，没有就新建（与 pet:send 的兜底一致），返回会话 id。
+ *  活动会话必须属于当前角色：换过角色后 id 还挂着旧会话时，接当前角色最近一段而不是往里写 */
 export function ensureActiveSession(): string {
+  const skin = loadConfig().character?.skin || 'yeshunguang'
   const existing = getActiveSessionId()
-  if (existing && loadSessions().sessions.some((s) => s.id === existing)) return existing
+  const active = existing ? loadSessions().sessions.find((s) => s.id === existing) : undefined
+  if (active && (active.characterId || 'yeshunguang') === skin) return active.id
   const store = loadSessions()
+  const latest = [...store.sessions]
+    .filter((s) => (s.characterId || 'yeshunguang') === skin)
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0]
+  if (latest) {
+    setActiveSession(latest.id)
+    return latest.id
+  }
   const session = newSession('')
   store.sessions.unshift(session)
   saveSessions(store)
@@ -668,7 +717,8 @@ async function runProfileExtraction(sessionId: string, llm: AppConfig['llm']): P
     if (!recent.some((m) => m.role === 'user' && !m.hidden)) return
     const dialogue = dialogueForExtraction(recent)
     if (dialogue.length < 20) return
-    await updateProfileFromConversation(llm, dialogue)
+    // 档案按会话归属角色分家：提取结果写进她的档案卡，不串台
+    await updateProfileFromConversation(llm, dialogue, session.characterId)
   } catch (error) {
     // 记忆是锦上添花：提取失败静默，不影响任何主流程
     console.error('[profile]', error)

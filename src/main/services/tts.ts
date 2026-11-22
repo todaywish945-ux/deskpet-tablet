@@ -92,6 +92,7 @@ function bailianPcm(config: TTSConfig, text: string, options: RunOptions): Promi
     )
 
     ws.on('open', () => {
+      if (settled || options.signal?.aborted) return
       armIdle()
       send('run-task', {
         task_group: 'audio',
@@ -110,6 +111,7 @@ function bailianPcm(config: TTSConfig, text: string, options: RunOptions): Promi
     })
 
     ws.on('message', (data, isBinary) => {
+      if (settled || options.signal?.aborted) return
       armIdle() // 收到任何消息都重新计时
       if (isBinary) {
         if (started) options.onChunk(data as Buffer)
@@ -267,11 +269,9 @@ async function gsvPcm(config: TTSConfig, text: string, options: RunOptions): Pro
   assertReady(config)
 
   const base = (config.gsvApiBase || 'http://127.0.0.1:9880').replace(/\/+$/, '')
-  // 合成超时 60s（冷启动首次推理 ~16s，GPU 被其他程序抢占时更慢）。
-  // 看门狗必须覆盖到"响应体全部读完"：只护 fetch 本身的话，头先到、正文卡死时
-  // arrayBuffer() 会永远挂住，整轮走不到收尾，她就一直停在说话状态
+  // 首次冷推理可能接近 100 秒；超时覆盖响应体读取，挂断仍可立即取消。
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60_000)
+  const timeout = setTimeout(() => controller.abort(), 120_000)
   const abortFromTurn = (): void => controller.abort()
   options.signal?.addEventListener('abort', abortFromTurn, { once: true })
   let wav: Buffer
@@ -289,7 +289,11 @@ async function gsvPcm(config: TTSConfig, text: string, options: RunOptions): Pro
         text_split_method: 'cut0',
         streaming_mode: false,
         media_type: 'wav',
-        speed_factor: Math.min(1.65, Math.max(0.6, config.speed || 1))
+        speed_factor: Math.min(1.65, Math.max(0.6, config.speed || 1)),
+        // 低温采样：压住小数据集微调"提前抽到结束符"的偶发截句（默认 1.0 偶发话说一半就收）
+        temperature: 0.7,
+        top_k: 15,
+        top_p: 0.85
       })
     })
     if (!response.ok) {
@@ -300,11 +304,11 @@ async function gsvPcm(config: TTSConfig, text: string, options: RunOptions): Pro
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
       if (options.signal?.aborted) throw new TTSError('已取消')
-      throw new TTSError('本地语音服务 60 秒没响应（显卡被其他程序占满时会这样），先关掉大型游戏再试。')
+      throw new TTSError('本地语音服务 120 秒内未完成合成，首次加载或显卡繁忙时可能较慢，请稍后重试。')
     }
     if (error instanceof TTSError) throw error
     // 合成失败顺便拉起本地服务，下一句就能用（服务在线时不会走到这）
-    void ensureGsvService(config)
+    await ensureGsvService(config) // 缺失专属推理配置的错误要返回调用方，不能成为未处理的后台拒绝
     throw new TTSError(
       '本地语音服务（GPT-SoVITS）没有连上，正在自动帮你启动，约一分钟后就绪，稍后再发一句试试。'
     )
@@ -336,6 +340,7 @@ async function gsvPcm(config: TTSConfig, text: string, options: RunOptions): Pro
 
 /** 按当前配置的引擎合成一句话语音，输出 16bit 单声道 24kHz PCM 流 */
 export function synthesizePcm(config: TTSConfig, text: string, options: RunOptions): Promise<void> {
+  if (options.signal?.aborted) return Promise.reject(new TTSError('已取消'))
   assertReady(config)
   if (config.provider === 'gptsovits') return gsvPcm(config, text, options)
   return bailianPcm(config, text, options)

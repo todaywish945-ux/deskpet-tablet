@@ -49,11 +49,15 @@ function minutesOfDay(d: Date): number {
 }
 
 function pickSessionId(): string | null {
-  // 优先当前活跃会话（渲染层正开着的），否则取最近聊过的，都没有就建一个新的
+  // 优先当前活跃会话（渲染层正开着的，且属于当前角色），否则在当前角色的会话里取最近聊过的，都没有就建一个新的
   const store = loadSessions()
   const activeId = getActiveSessionId()
-  if (activeId && store.sessions.some((s) => s.id === activeId)) return activeId
-  const latest = [...store.sessions].sort((a, b) => b.updatedAt - a.updatedAt)[0]
+  const skin = loadConfig().character?.skin || 'yeshunguang'
+  const active = activeId ? store.sessions.find((s) => s.id === activeId) : undefined
+  if (active && (active.characterId || 'yeshunguang') === skin) return active.id
+  const latest = [...store.sessions]
+    .filter((s) => (s.characterId || 'yeshunguang') === skin)
+    .sort((a, b) => b.updatedAt - a.updatedAt)[0]
   if (latest) return latest.id
   const session = newSession('')
   store.sessions.unshift(session)
@@ -134,11 +138,13 @@ function tick(): void {
       idleMs >= 10 * 60_000 &&
       Date.now() - lastProactiveAt >= 30 * 60_000
     ) {
-      const lastReview = getLastReviewDate()
+      // 周回顾只看当前角色自己的心情卡（她回顾的是"和你聊天这一周"）
+      const skin = loadConfig().character?.skin || 'yeshunguang'
+      const lastReview = getLastReviewDate(skin)
       const gapOk = !lastReview || Date.now() - new Date(`${lastReview}T12:00:00`).getTime() >= 7 * 86_400_000
-      const data = weeklyReviewData()
+      const data = weeklyReviewData(skin)
       if (gapOk && data) {
-        markReviewed()
+        markReviewed(skin)
         const trend =
           data.lastWeekAvg != null
             ? data.lastWeekAvg > 0
