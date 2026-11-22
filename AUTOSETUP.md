@@ -170,11 +170,13 @@ A 在线克隆 / B 本地 GPT-SoVITS（下一行给整合包目录）/ C 暂不�
        "gsvLauncherPath": "<整合包目录下任意存在的文件路径，如 api_v2.py 的完整路径；应用只用它定位整合包目录>"
        参考音频已内置在安装目录，不用另找；其他字段不动 → 重启平板桌宠；
      - N卡 ✓ 但整合包 ✗：帮我下载并配置，全程代办：
-       1. 先查我的显卡型号（nvidia-smi 输出）：优先找发布页里 RTX 50 对应的 50x0 特供包；
+       1. 先查我的显卡型号（nvidia-smi 输出）：RTX 50 系选 50x0 特供包；
           40 系及以下选普通 v2ProPlus 包；**不要下载 v3 整合包（已知会让人声发糊）**；
-       2. 从 https://github.com/RVC-Boss/GPT-SoVITS/releases 下载 v4 或 v2ProPlus 整合包
-          （约 10GB 的 .7z 文件）到下载文件夹；发布页没有 v4 就用 v2ProPlus；
-          国内下载慢就在链接前加 https://gh-proxy.com/ 前缀；
+       2. 下载 v4 或 v2ProPlus 整合包（约 10GB 的 .7z 文件）到下载文件夹，按顺序试：
+          国内优先（直连快） https://hf-mirror.com/lj1995/GPT-SoVITS-windows-package
+          （进这个页面找最新版，点文件名旁的下载箭头）
+          备用 https://github.com/RVC-Boss/GPT-SoVITS/releases
+          （国内慢就加 https://gh-proxy.com/ 前缀）；
        3. 解压到纯英文路径（如 D:\GPT-SoVITS；系统解压不了就先安装 7-Zip 再解压）；
        4. 解压完按上面"N卡 ✓ + 整合包 ✓"的流程继续配置；
        下载或解压连续失败 2 次 → 停下，把发布页链接和报错贴给我，由我手动下载。
