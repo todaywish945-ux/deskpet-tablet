@@ -2087,3 +2087,19 @@ img.char.pop-in {
 .qq-confirm-btn.danger:hover {
   background: rgba(248, 113, 113, 0.24);
 }
+
+/* 设置按钮上的「可更新」圆点（主界面新版本提醒，数据来自启动静默检查） */
+#settings-btn {
+  position: relative;
+}
+#settings-btn.update-dot::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffd75e;
+  box-shadow: 0 0 6px rgba(255, 215, 94, 0.8);
+}

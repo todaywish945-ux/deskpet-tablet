@@ -35,6 +35,15 @@ winMinBtn.addEventListener('click', () => void api.winMinimize())
 winMaxBtn.addEventListener('click', () => void api.winMaximizeToggle())
 winCloseBtn.addEventListener('click', () => void api.winClose())
 settingsBtn.addEventListener("click", () => void api.openSettings())
+// 主界面新版本提醒：启动 25 秒后（等主进程的静默检查落定）有新版就在设置按钮上亮个圆点，
+// 不弹窗不弹岛，用户点设置就能看到详情
+setTimeout(() => {
+  void api.getUpdateNotice().then((notice) => {
+    if (!notice?.hasUpdate) return
+    settingsBtn.classList.add('update-dot')
+    settingsBtn.title = `新版本 v${notice.version} 已发布，点开设置更新`
+  }).catch(() => {})
+}, 25_000)
 const topicInput = document.getElementById('topic-input') as HTMLInputElement
 
 const sessionView = document.getElementById('session-view') as HTMLDivElement

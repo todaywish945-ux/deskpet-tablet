@@ -11,6 +11,7 @@ import { startPluginBridge, stopPluginBridge } from './services/pluginBridge'
 import { assetRoot, activeSkinDir, findSkinDir, loadConfig, resolveTtsConfig } from './services/store'
 import { stopSpawnedGsvExcept, warmUpGsv } from './services/gsv'
 import { processStagedSkinInstalls } from './services/skinStore'
+import { refreshUpdateNotice } from './services/updater'
 
 // 产品名已改为「敲敲」：数据目录沿用旧名，历史配置/会话/记忆（含 API Key）原地保留，
 // 绝不能因为改名搬到新目录——一搬就等于用户数据全丢。
@@ -147,6 +148,8 @@ if (!gotLock) {
 
     registerIpc()
     startPluginBridge() // 桥先起：打包版桌宠窗口要从桥加载页面（见 petWindow.ts）
+    // 启动 20 秒后静默检查一次更新，结果供主界面「可更新」圆点使用（失败静默，不打扰）
+    setTimeout(() => { void refreshUpdateNotice() }, 20_000).unref?.()
     createPetWindow()
     // 先清掉上次运行留下的闲置角色实例（台账只记本应用拉起的，手动开的绝不碰），再预热当前角色。
     // 预热同样使用当前角色快照；声明损坏只报错，不阻止窗口初始化。

@@ -33,7 +33,7 @@ import {
 import { runTurn, cancelActiveTurn } from './services/chatPipeline'
 import { loadProfile, deleteFact } from './services/profile'
 import { enrollVoice } from './services/enrollment'
-import { checkForUpdate, downloadLatestInstaller, installDownloadedInstaller, cancelDownload, openReleasePage } from './services/updater'
+import { checkForUpdate, downloadLatestInstaller, installDownloadedInstaller, cancelDownload, openReleasePage, getUpdateNotice } from './services/updater'
 import { availableSkins, downloadSkin, cancelSkinDownload } from './services/skinStore'
 import { synthesizeWav } from './services/tts'
 
@@ -309,6 +309,8 @@ export function registerIpc(): void {
   })
   ipcMain.handle('update:install', () => installDownloadedInstaller())
   ipcMain.handle('update:open-page', (_event, url: string) => openReleasePage(url))
+  // 主界面「可更新」圆点的数据源：启动时静默检查的缓存结果
+  ipcMain.handle('update:notice', () => getUpdateNotice())
 
   // ---------- 应用内下载角色（皮肤包） ----------
 

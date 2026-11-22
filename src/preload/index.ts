@@ -35,6 +35,8 @@ contextBridge.exposeInMainWorld('petAPI', {
   winMinimize: () => ipcRenderer.invoke('win:minimize'),
   winMaximizeToggle: () => ipcRenderer.invoke('win:maximize-toggle'),
   winClose: () => ipcRenderer.invoke('win:close'),
+  /** 主界面「可更新」圆点：启动静默检查的缓存结果（null=还没检查过） */
+  getUpdateNotice: () => ipcRenderer.invoke('update:notice'),
   /** 可选角色皮肤列表（设置页下拉） */
   listSkins: () => ipcRenderer.invoke('skins:list'),
   /** 敲敲界面内切换角色（= 换皮肤整体生效：人设/动画/语音） */
@@ -105,6 +107,8 @@ contextBridge.exposeInMainWorld('settingsAPI', {
   onUpdateProgress: (callback: (progress: { received: number; total: number }) => void) => {
     ipcRenderer.on('update:progress', (_event, progress) => callback(progress))
   },
+  /** 主界面「可更新」圆点：启动静默检查的缓存结果（null=还没检查过） */
+  getUpdateNotice: () => ipcRenderer.invoke('update:notice'),
   /** 应用内下载角色：可用列表 / 下载（进度走 onSkinProgress）/ 取消 */
   availableSkins: () => ipcRenderer.invoke('skins:available'),
   downloadSkin: (id: string) => ipcRenderer.invoke('skins:download', id),

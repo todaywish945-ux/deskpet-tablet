@@ -219,6 +219,24 @@ export async function streamToFile(
   }
 }
 
+// ---------- 启动提醒：主界面设置按钮上的「可更新」圆点 ----------
+
+let cachedNotice: { hasUpdate: boolean; version: string | null; checkedAt: number } | null = null
+
+/** 静默检查一次并缓存结果（失败也缓存，失败状态不打扰主界面） */
+export async function refreshUpdateNotice(): Promise<void> {
+  try {
+    const info = await checkForUpdate()
+    cachedNotice = { hasUpdate: info.ok && info.hasUpdate, version: info.version, checkedAt: Date.now() }
+  } catch {
+    cachedNotice = { hasUpdate: false, version: null, checkedAt: Date.now() }
+  }
+}
+
+export function getUpdateNotice(): { hasUpdate: boolean; version: string | null; checkedAt: number } | null {
+  return cachedNotice
+}
+
 let downloadedInstallerPath: string | null = null
 let activeDownload: AbortController | null = null
 let cancelRequested = false

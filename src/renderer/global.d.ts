@@ -9,6 +9,8 @@ declare global {
       winMinimize: () => Promise<void>
       winMaximizeToggle: () => Promise<void>
       winClose: () => Promise<void>
+      /** 主界面「可更新」圆点：启动静默检查的缓存结果（null=还没检查过） */
+      getUpdateNotice: () => Promise<{ hasUpdate: boolean; version: string | null; checkedAt: number } | null>
       /** 可选角色皮肤列表（设置页下拉 / 敲敲分组树与联系人卡） */
       listSkins: () => Promise<{ id: string; name: string; backend: 'video' | 'live2d'; avatar?: string }[]>
       /** 敲敲界面内切换角色（= 换皮肤整体生效：人设/动画/语音） */
@@ -62,6 +64,7 @@ declare global {
       installUpdate: () => Promise<UpdateDownloadResult>
       openReleasePage: (url: string) => Promise<void>
       onUpdateProgress: (callback: (progress: { received: number; total: number }) => void) => void
+      getUpdateNotice: () => Promise<{ hasUpdate: boolean; version: string | null; checkedAt: number } | null>
       availableSkins: () => Promise<SkinStoreResult>
       downloadSkin: (id: string) => Promise<SkinDownloadResult>
       cancelSkinDownload: () => Promise<boolean>
